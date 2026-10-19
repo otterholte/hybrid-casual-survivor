@@ -9,14 +9,14 @@ A hybrid-casual, island-survival party game: a season of a reality competition s
 | Phase | Time | What happens |
 | --- | --- | --- |
 | 📿 **Immunity Challenge** | 30–90s | A one-action skill game. First to finish (or last one standing) wins the necklace and can't be voted out. |
-| 🏝️ **Back at Camp** | ~1:45 | A timed phase. Hunt for a hidden immunity idol, message castaways (preset or typed), or spy on conversations. |
-| 🔥 **Tribal Council** | ~1:30 + vote | Speak up, then cast a secret vote. Idols are played after votes are cast and before they're read. Then the vote reading. |
+| 🏝️ **Back at Camp** | your pace | Two actions per day: a private strategy talk, spying on one castaway, or searching for a hidden immunity idol. Messages castaways send you are free to answer. Optional time limit. |
+| 🔥 **Tribal Council** | ~4 min | The host questions specific castaways (you answer by multiple choice), then everyone votes in secret. Idols are played before the votes are read on a big vote board. |
 | ⚖️ **Final Tribal** | — | Everyone voted out sits on the jury. The final three plead their case and the jury crowns the **Island Champion**. |
 
 ## Immunity challenges
 
 - 🥥 **Coconut Drop**: pull back the slingshot and lob coconuts into a swinging sack until the rope snaps.
-- 🎱 **Spiral Catch**: balls roll down switchback ramps; tap when one hits the catch zone. Drop one and you're out.
+- 🎱 **Spiral Catch**: balls zigzag down three lanes; tap the right lane when one reaches its catch zone. Caught balls come back down a random lane. Drop one and you're out.
 - 🧩 **Slide Puzzle**: rebuild the scrambled tiki sun.
 - 🗿 **Totem Stack**: drop sliding carved blocks; overhang is chopped off.
 - ⚖️ **Ball Balance**: tilt a rope-held disc to keep every ball aboard as wind picks up.
@@ -26,11 +26,17 @@ Every challenge has Easy / Normal / Hard tuning and a **Practice** mode with per
 
 ## Camp strategy
 
-- **Strategy chats**: send preset messages ("Want to work together?", "I think we should vote out ___") or type your own. Bots answer based on how much they trust you, and they may lie. Each castaway only talks for so long per day.
-- **Spying**: sneak up on someone, then overhear their conversations for 15 seconds. Some words are garbled, some recipients hidden, and you might get caught.
-- **Idol hunting**: pick a spot and dig with hot/cold clues. It costs time you could spend talking, and people notice when you're gone.
+- **Strategy talks**: one private conversation per action. Send presets ("Want to work together?", "I think we should vote out ___") or type your own. When a castaway asks you something, you get quick replies (Yes / Maybe / Not them / pick a name). They may lie.
+- **Spying**: sneak up on one castaway and overhear them for 15 seconds. Some words are garbled, some recipients hidden, and you might get caught.
+- **Idol search**: pick an area and check three spots. Clues point you toward the right area and the right spot.
 
 Bots remember promises. If you tell someone you're voting one way and then don't, they'll know, and so will the jury.
+
+## Your castaway
+
+Choose man or woman, then customize skin tone, face shape, eyes, eye color, brows, nose, mouth, hair style and color, facial hair and buff color. Immunity winners wear the necklace and glow gold everywhere until Tribal is over.
+
+You can pause any time during a season (top-left button or Esc) and quit back to the menu.
 
 ## Tech
 

@@ -84,7 +84,7 @@ export default {
         sand(g, W, GROUND - 12, H);
         palm(g, 20, GROUND, 320, 40, t);
         if (wind) {
-          g.fillStyle = '#fff'; g.font = '15px "Luckiest Guy", sans-serif'; g.textAlign = 'center';
+          g.fillStyle = '#fff'; g.font = '19px "Bebas Neue", sans-serif'; g.textAlign = 'center';
           g.fillText(`WIND ${wind > 0 ? '→' : '←'} ${Math.round(Math.abs(wind) / 10)}`, 300, 34);
         }
         for (const p of poles) {
@@ -92,7 +92,7 @@ export default {
           g.fillStyle = p.done ? '#7bc043' : '#ef476f';
           g.beginPath(); g.arc(p.x, GROUND - p.h, 7, 0, Math.PI * 2); g.fill();
           if (p.done) {
-            g.fillStyle = '#fff'; g.font = '16px "Luckiest Guy", sans-serif'; g.textAlign = 'center';
+            g.fillStyle = '#fff'; g.font = '20px "Bebas Neue", sans-serif'; g.textAlign = 'center';
             g.fillText('✓', p.x, GROUND - p.h - 14);
           }
         }
@@ -119,10 +119,10 @@ export default {
             g.beginPath(); g.moveTo(swipe.start.x, swipe.start.y); g.lineTo(swipe.cur.x, swipe.cur.y); g.stroke();
           }
         }
-        g.fillStyle = '#fff'; g.font = '22px "Luckiest Guy", sans-serif'; g.textAlign = 'center';
+        g.fillStyle = '#fff'; g.font = '26px "Bebas Neue", sans-serif'; g.textAlign = 'center';
         g.fillText(`POLES: ${got} / 4`, 120, 34);
         if (t < 4 && !got) {
-          g.font = '18px "Luckiest Guy", sans-serif';
+          g.font = '22px "Bebas Neue", sans-serif';
           g.fillText('SWIPE UP & RIGHT TO THROW', 200, 650 - Math.abs(Math.sin(t * 3)) * 5);
         }
       },

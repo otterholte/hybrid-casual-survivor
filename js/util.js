@@ -24,7 +24,21 @@ export function h(tag, attrs = {}, ...children) {
   return el;
 }
 
-export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// Global pause: game timers and sleeps stop advancing while paused.
+export const clock = { paused: false };
+export function sleep(ms) {
+  return new Promise((resolve) => {
+    let left = ms, last = performance.now();
+    const tick = () => {
+      const now = performance.now();
+      if (!clock.paused) left -= now - last;
+      last = now;
+      if (left <= 0) resolve();
+      else setTimeout(tick, Math.min(60, left));
+    };
+    setTimeout(tick, Math.min(60, ms));
+  });
+}
 export const rand = (a, b) => a + Math.random() * (b - a);
 export const randi = (a, b) => Math.floor(rand(a, b + 1));
 export const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];

@@ -5,7 +5,7 @@ import slide from './slide.js';
 import totem from './totem.js';
 import balance from './balance.js';
 import ring from './ring.js';
-import { h, rand, sleep, clamp, store } from '../util.js';
+import { h, rand, sleep, clamp, store, clock } from '../util.js';
 import { show, banner, setScene, setMusic, avatarChip } from '../ui.js';
 import { sfx } from '../audio.js';
 import { avatarSVG } from '../avatar.js';
@@ -54,9 +54,9 @@ export function runChallenge({ ch, players, diff, final = false, practice = fals
           h('span', { class: `pill diff-${diff}` }, diff.toUpperCase()),
           h('span', { class: 'pill' }, ch.mode === 'race' ? `⏱ First to finish wins` : '⏳ Last one standing'),
           goal ? h('span', { class: 'pill' }, `🎯 ${goal} ${ch.unit}`) : null),
-        !practice ? h('div', { class: 'necklace-tease' }, h('span', { class: 'necklace' }, '📿'), ' Win and you cannot be voted out tonight.') : null,
+        !practice ? h('div', { class: 'necklace-tease' }, '📿 Win and you cannot be voted out tonight.') : null,
         h('div', { class: 'rivals' }, ...bots.map((b) => avatarChip(b, { size: 40 }))),
-        h('button', { class: 'btn btn-orange btn-big', onclick: () => { sfx('click'); go(); } }, "I'm Ready!"),
+        h('button', { class: 'btn btn-big', onclick: () => { sfx('click'); go(); } }, "I'm Ready!"),
       );
       show(scr);
       sfx('drum');
@@ -146,9 +146,10 @@ export function runChallenge({ ch, players, diff, final = false, practice = fals
 
     let last = performance.now(), raf;
     const frame = (now) => {
+      if (clock.paused) { last = now; raf = requestAnimationFrame(frame); return; }
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
-      if (running) {
+      if (running && !clock.paused) {
         t += dt;
         inst.update(dt, t);
       }
@@ -173,7 +174,7 @@ export function runChallenge({ ch, players, diff, final = false, practice = fals
       g.globalAlpha = 1;
       for (const x of texts) {
         g.globalAlpha = Math.min(1, x.life * 2);
-        g.font = `${x.size}px "Luckiest Guy", sans-serif`;
+        g.font = `${x.size + 4}px "Bebas Neue", sans-serif`;
         g.textAlign = 'center';
         g.lineWidth = 5; g.strokeStyle = 'rgba(40,20,5,.8)'; g.strokeText(x.str, x.x, x.y);
         g.fillStyle = x.color; g.fillText(x.str, x.x, x.y);
@@ -285,11 +286,11 @@ export function runChallenge({ ch, players, diff, final = false, practice = fals
       }
       if (winner.human) {
         sfx('win');
-        await banner({ title: 'YOU WIN IMMUNITY!', sub: myTime ? `${ch.mode === 'race' ? 'Finished' : 'Survived'} in ${myTime.toFixed(1)}s` : '', icon: '📿', tone: 'gold', tap: true });
+        await banner({ title: 'YOU WIN IMMUNITY!', sub: myTime ? `${ch.mode === 'race' ? 'Finished' : 'Survived'} in ${myTime.toFixed(1)}s` : '', icon: avatarSVG(me.look, { size: 120, expr: 'happy', necklace: true }), tone: 'gold', tap: true });
       } else {
         sfx(myFail || !myDone ? 'fail' : 'drum');
         const sub = myFail ? `${failMsg} ${winner.name} outlasted everyone.` : `${winner.name} ${ch.mode === 'race' ? 'finished first' : 'outlasted everyone'}.`;
-        await banner({ title: `${winner.name.toUpperCase()} WINS IMMUNITY`, sub, icon: avatarSVG(winner.look, { size: 120, expr: 'happy' }), tone: 'sun', tap: true });
+        await banner({ title: `${winner.name.toUpperCase()} WINS IMMUNITY`, sub, icon: avatarSVG(winner.look, { size: 120, expr: 'happy', necklace: true }), tone: 'gold', tap: true });
       }
       resolve({ winner: winnerId, order });
     }

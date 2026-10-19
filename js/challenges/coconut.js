@@ -182,7 +182,7 @@ export default {
         }
         if (t < 4 && !count) {
           g.fillStyle = 'rgba(255,255,255,.9)';
-          g.font = '18px "Luckiest Guy", sans-serif';
+          g.font = '22px "Bebas Neue", sans-serif';
           g.textAlign = 'center';
           g.fillText('DRAG BACK & RELEASE', 200, 630 - Math.abs(Math.sin(t * 3)) * 6);
         }

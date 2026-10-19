@@ -1,5 +1,5 @@
 // Everything you hear is synthesized live with the Web Audio API: no audio files.
-import { store, rand } from './util.js';
+import { store, rand, pick } from './util.js';
 
 const PENTA = [0, 2, 4, 7, 9]; // major pentatonic, the "island" sound
 const noteHz = (midi) => 440 * Math.pow(2, (midi - 69) / 12);
@@ -166,6 +166,22 @@ class AudioEngine {
         for (let i = 0; i < 6; i++) this.noise({ dur: 0.9, vol: 0.07, type: 'bandpass', freq: rand(900, 2200), q: 4, attack: 0.1, delay: i * 0.05 });
         break;
       case 'win': this.play('fanfare'); this.play('cheer'); break;
+      // Cinematic Tribal sounds.
+      case 'heartbeat':
+        this.tone({ freq: 62, slideTo: 40, dur: 0.18, vol: 0.55, attack: 0.008 });
+        this.tone({ freq: 58, slideTo: 38, dur: 0.2, vol: 0.4, attack: 0.008, delay: 0.24 });
+        break;
+      case 'swell': this.noise({ dur: 0.9, vol: 0.16, type: 'bandpass', freq: 300, slideTo: 2600, q: 0.8, attack: 0.8 }); this.tone({ freq: 110, slideTo: 220, type: 'sawtooth', dur: 0.85, vol: 0.05, attack: 0.8, filter: 700 }); break;
+      case 'reveal':
+        this.tone({ freq: 58, slideTo: 32, dur: 1.8, vol: 0.9, attack: 0.005 });
+        this.noise({ dur: 1.4, vol: 0.3, freq: 420, slideTo: 90, attack: 0.005 });
+        this.tone({ freq: 1661, dur: 1.6, vol: 0.035, attack: 0.01 });
+        this.tone({ freq: 2489, dur: 1.2, vol: 0.02, attack: 0.01 });
+        this.tone({ freq: 110, type: 'triangle', dur: 2.2, vol: 0.12, attack: 0.02, filter: 500 });
+        break;
+      case 'cast': this.tone({ freq: 90, slideTo: 45, dur: 1.1, vol: 0.55 }); this.noise({ dur: 0.9, vol: 0.12, freq: 600, slideTo: 120, attack: 0.15 }); break;
+      case 'void': this.tone({ freq: 140, slideTo: 70, type: 'sawtooth', dur: 0.5, vol: 0.12, filter: 600 }); this.tone({ freq: 70, slideTo: 40, dur: 0.6, vol: 0.5 }); break;
+      case 'question': this.tone({ freq: 74, slideTo: 60, dur: 0.9, vol: 0.35 }); this.tone({ freq: 880, dur: 0.8, vol: 0.025, attack: 0.05 }); break;
     }
   }
 
@@ -198,16 +214,18 @@ class AudioEngine {
         if (s % 4 === 0) this.marimba(scale(60, mel[s / 4]), d, 0.2, this.musicBus);
         if (s === 0) this.marimba(scale(36, mel[0]), d, 0.35, this.musicBus);
       } },
-      tribal: { bpm: 66, fn: (s, d, bar) => {
-        if (s === 0) this.drum(d, 0.9, this.musicBus, 60);
-        if (s === 8) this.drum(d, 0.6, this.musicBus, 65);
-        if (s === 12 && bar % 2) this.drum(d, 0.3, this.musicBus, 140);
-        if (s === 0 && bar % 2 === 0) this.tone({ freq: noteHz(38), type: 'triangle', dur: 3.5, vol: 0.18, attack: 0.8, delay: d, bus: this.musicBus, filter: 300 });
-        if (s === 6 && Math.random() < 0.35) this.marimba(scale(57, Math.floor(rand(0, 5))), d, 0.08, this.musicBus);
+      tribal: { bpm: 60, fn: (s, d, bar) => {
+        if (s === 0) this.drum(d, 0.8, this.musicBus, 55);
+        if (s === 6 && bar % 2) this.drum(d, 0.35, this.musicBus, 62);
+        if (s === 0 && bar % 2 === 0) {
+          this.tone({ freq: noteHz(33), type: 'sawtooth', dur: 4.2, vol: 0.05, attack: 1.2, delay: d, bus: this.musicBus, filter: 220 });
+          this.tone({ freq: noteHz(45), type: 'triangle', dur: 4.2, vol: 0.06, attack: 1.2, delay: d, bus: this.musicBus, filter: 400 });
+        }
+        if (s === 10 && Math.random() < 0.3) this.tone({ freq: noteHz(pick([69, 72, 76])), dur: 1.4, vol: 0.02, attack: 0.3, delay: d, bus: this.musicBus });
       } },
-      tension: { bpm: 80, fn: (s, d) => {
-        if (s % 4 === 0) this.drum(d, 0.45, this.musicBus, 70);
-        if (s === 0) this.tone({ freq: noteHz(41), type: 'sawtooth', dur: 3, vol: 0.05, attack: 0.5, delay: d, bus: this.musicBus, filter: 400 });
+      tension: { bpm: 70, fn: (s, d, bar) => {
+        if (s === 0) { this.tone({ freq: 62, slideTo: 40, dur: 0.18, vol: 0.45, attack: 0.008, delay: d, bus: this.musicBus }); this.tone({ freq: 58, slideTo: 38, dur: 0.2, vol: 0.32, attack: 0.008, delay: d + 0.24, bus: this.musicBus }); }
+        if (s === 0 && bar % 2 === 0) this.tone({ freq: noteHz(31), type: 'sawtooth', dur: 4, vol: 0.05, attack: 1.5, delay: d, bus: this.musicBus, filter: 260 });
       } },
     };
     const song = songs[name];

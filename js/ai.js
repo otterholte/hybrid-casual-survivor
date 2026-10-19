@@ -80,63 +80,129 @@ export function perceivedDanger(b) {
 const say = (arr) => pick(arr);
 const T = (id) => (id === H ? 'you' : nm(id));
 
+// A bot's reply is { text, options? }. Options are quick replies; each fx returns another reply (or a string).
+function backingVote(botId, X) {
+  const s = S();
+  s.promises[botId] = X;
+  adjTrust(botId, H, 0.08);
+  s.influence[botId][X] += 0.25;
+  computePlans();
+}
+
+function namesOptions(botId, exclude, onPick) {
+  const opts = shuffle(candidates(botId, [H, ...exclude])).slice(0, 3);
+  return opts.map((c) => ({ label: nm(c), fx: () => onPick(c) }));
+}
+
+function askedWho(botId, exclude = []) {
+  return namesOptions(botId, exclude, (c) => {
+    const s = S();
+    s.promises[botId] = c;
+    if (s.plan[botId] === c) { adjTrust(botId, H, 0.1); return 'Same. Good, we’re on the same page.'; }
+    if (s.allied[botId][c]) { adjTrust(botId, H, -0.15); return `${nm(c)}? Oh. I can’t do that one.`; }
+    s.influence[botId][c] += 0.25 + Math.max(0, s.trust[botId][H]) * 0.5;
+    computePlans();
+    return s.plan[botId] === c ? `Okay. ${nm(c)} it is. I’m with you.` : `${nm(c)}... I’ll think about it.`;
+  }).concat([{ label: 'No idea yet', fx: () => { adjTrust(botId, H, -0.02); return 'Okay. Let me know before Tribal.'; } }]);
+}
+
+function namedTarget(botId, X, lead) {
+  const s = S();
+  s.botTold[botId] = X;
+  return {
+    text: `${lead} ${nm(X)}. You good with that?`,
+    options: [
+      { label: 'Yes, I’m in', fx: () => { backingVote(botId, X); return pick(['Good. Keep it quiet.', 'Perfect. We’re locked in.']); } },
+      { label: 'Maybe', fx: () => 'Okay. Don’t wait too long to decide.' },
+      { label: `Not ${nm(X)}`, fx: () => {
+        adjTrust(botId, H, -0.03);
+        s.influence[botId][X] -= 0.15;
+        computePlans();
+        return { text: 'Then who?', options: askedWho(botId, [X]) };
+      } },
+    ],
+  };
+}
+
 export function replyTo(botId, presetId, target, freeText) {
   const s = S(), b = P(botId), tr = s.trust[botId][H], bt = b.t;
   const plan = s.plan[botId];
-  let out;
   switch (presetId) {
     case 'who': {
       const honest = tr + bt.honesty * 0.5 > 0.45;
       if (plan === H) {
-        if (bt.honesty > 0.85 && tr > 0.3) out = "Honestly? Your name came up. I'm not happy about it either.";
-        else {
-          const decoy = pick(candidates(botId, [H])) ?? plan;
-          s.botTold[botId] = decoy;
-          out = say([`I'm thinking ${nm(decoy)}. Easy vote.`, `Probably ${nm(decoy)}. You good with that?`, `${nm(decoy)}, for sure. Don't spread it.`]);
+        if (bt.honesty > 0.85 && tr > 0.3) {
+          return {
+            text: 'Honestly? Your name came up. I’m not happy about it either.',
+            options: [
+              { label: 'Who’s pushing it?', fx: () => {
+                const k = aliveBots().find((x) => x.id !== botId && s.plan[x.id] === H);
+                adjTrust(botId, H, 0.05);
+                return k ? `Mostly ${k.name}. You didn’t hear it from me.` : 'I don’t know exactly. It’s just going around.';
+              } },
+              { label: 'Help me flip it', fx: () => {
+                if (s.trust[botId][H] > 0.25) { s.influence[botId][H] -= 0.5; computePlans(); return 'I’ll see what I can do. Give me a name to push instead.'; }
+                return 'I don’t know if I can. I’m sorry.';
+              } },
+            ],
+          };
         }
-      } else if (honest && plan != null) {
-        s.botTold[botId] = plan;
-        out = say([`Between us? ${nm(plan)}.`, `I'm leaning ${nm(plan)}. They're dangerous.`, `${nm(plan)}. I think it's the move.`]);
-      } else {
-        const lie = pick(candidates(botId, [H, plan])) ?? plan;
-        if (lie != null && chance(0.6)) {
-          s.botTold[botId] = lie;
-          out = say([`Uh... ${nm(lie)}, maybe?`, `I guess ${nm(lie)}? Still figuring it out.`]);
-        } else out = say(["Not sure yet. I'm keeping my options open.", "Still feeling it out. Who are YOU thinking?"]);
+        return namedTarget(botId, pick(candidates(botId, [H])) ?? plan, pick(['I’m thinking', 'Probably', 'Between us?']));
       }
-      break;
+      if (honest && plan != null) return namedTarget(botId, plan, pick(['Between us?', 'I’m leaning', 'Probably']));
+      const lie = pick(candidates(botId, [H, plan]));
+      if (lie != null && chance(0.55)) return namedTarget(botId, lie, pick(['Uh... maybe', 'I guess']));
+      return { text: 'Not sure yet. Who are you thinking?', options: askedWho(botId) };
     }
     case 'ally': {
-      if (s.allied[botId][H]) { out = "We already are! Don't make it weird 😄"; adjTrust(botId, H, 0.03); break; }
+      if (s.allied[botId][H]) { adjTrust(botId, H, 0.03); return { text: 'We already are. Don’t make it weird.' }; }
       const accept = tr + bt.social * 0.3 + rand(0, 0.3) > 0.4;
       if (accept) {
         s.allied[botId][H] = s.allied[H][botId] = true;
         if (bt.honesty > 0.3 || tr > 0.2) adjTrust(botId, H, 0.25);
         s.threat[H] += 0.03;
-        out = say(["I'm in. You and me, all the way.", "Deal. I've been waiting for someone to ask.", "Yes. Let's keep it quiet though."]);
-      } else {
-        adjTrust(botId, H, 0.05);
-        out = say(["Let's see how tonight's vote goes first.", "I like you, but it's early. Show me something.", "Hmm. Maybe. Let me think."]);
+        return { text: pick(['I’m in. You and me, all the way.', 'Deal. I was hoping someone would ask.', 'Yes. Let’s keep it quiet though.']) };
       }
-      break;
+      adjTrust(botId, H, 0.05);
+      return { text: pick(['Let’s see how tonight’s vote goes first.', 'I like you, but it’s early. Show me something.']) };
     }
     case 'voteout': {
-      if (target == null) { out = 'Who?'; break; }
-      if (target === botId) { adjTrust(botId, H, -0.4); out = say(["...Me?! Wow. Good to know.", "You're telling ME to vote MYSELF out? Bold."]); break; }
+      if (target == null) return { text: 'Who?' };
+      if (target === botId) { adjTrust(botId, H, -0.4); return { text: pick(['...Me? Wow. Good to know.', 'You’re telling ME to vote myself out. Bold.']) }; }
       s.promises[botId] = target;
       const pull = 0.25 + Math.max(0, tr) * 0.9;
-      if (plan === target) { s.influence[botId][target] += pull; adjTrust(botId, H, 0.1); out = say([`Same page. ${nm(target)} has to go.`, `Yes! I was going to say the same thing.`, `${nm(target)}. Locked in.`]); }
-      else if (s.allied[botId][target] || s.trust[botId][target] > 0.45) { s.influence[botId][target] += pull * 0.3; adjTrust(botId, H, -0.05); out = say([`${nm(target)}? No way, ${nm(target)} is with me.`, `I can't do ${nm(target)}. Pick someone else.`]); }
-      else { s.influence[botId][target] += pull; out = say([`Hmm, ${nm(target)}... I could see it.`, `Interesting. Tell me more about why ${nm(target)}.`, `Maybe. If the numbers are there, I'm in.`]); }
+      if (plan === target) { s.influence[botId][target] += pull; adjTrust(botId, H, 0.1); computePlans(); return { text: pick([`Same page. ${nm(target)} has to go.`, 'Yes. I was going to say the same thing.', `${nm(target)}. Locked in.`]) }; }
+      if (s.allied[botId][target] || s.trust[botId][target] > 0.45) {
+        s.influence[botId][target] += pull * 0.3;
+        adjTrust(botId, H, -0.05);
+        computePlans();
+        return {
+          text: `${nm(target)}? No way. ${nm(target)} is with me.`,
+          options: [
+            { label: 'Okay, forget it', fx: () => { adjTrust(botId, H, 0.04); delete s.promises[botId]; return 'Thanks. We’re good.'; } },
+            { label: `${nm(target)} is playing you`, fx: () => { adjTrust(botId, target, -0.12 - Math.max(0, tr) * 0.2); adjTrust(botId, H, -0.03); s.influence[botId][target] += 0.15; computePlans(); return 'I’ll keep my eyes open. That’s all I’m promising.'; } },
+          ],
+        };
+      }
+      s.influence[botId][target] += pull;
       computePlans();
-      break;
+      return {
+        text: pick([`Hmm, ${nm(target)}... I could see it.`, `${nm(target)}. Interesting.`]),
+        options: [
+          { label: 'So you’re in?', fx: () => {
+            if (s.plan[botId] !== target) return 'Maybe. Let me see where the numbers are first.';
+            backingVote(botId, target);
+            return `Yeah. I’m in on ${nm(target)}.`;
+          } },
+          { label: 'Think it over', fx: () => 'I will.' },
+        ],
+      };
     }
     case 'trust': {
       adjTrust(botId, H, 0.04);
-      if (tr > 0.35) out = say(["100%. I've got your back.", "Absolutely. You're one of my people.", "Of course. We're good."]);
-      else if (tr > 0) out = say(["Yeah... I think so.", "Sure! Why, what have you heard?", "I mean, as much as anyone out here."]);
-      else out = say(["Of course... why do you ask?", "...Yeah. Totally.", "Why wouldn't you?"]);
-      break;
+      if (tr > 0.35) return { text: pick(['100%. I’ve got your back.', 'Absolutely. You’re one of my people.']) };
+      if (tr > 0) return { text: pick(['Yeah. I think we’re good.', 'I mean, as much as anyone out here.']) };
+      return { text: pick(['Of course...', '...Yeah. Totally.']) };
     }
     case 'idol': {
       adjTrust(botId, H, 0.15);
@@ -144,43 +210,47 @@ export function replyTo(botId, presetId, target, freeText) {
       s.influence[botId][H] -= 0.7;
       if (chance((1 - bt.loyal) * 0.7)) s.leaks.push({ from: botId, about: H, kind: 'idol' });
       computePlans();
-      out = say(["Whoa. Your secret's safe with me.", "Seriously?! Okay. I won't tell a soul.", "That changes things. Thanks for trusting me."]);
-      break;
+      return { text: pick(['Whoa. Your secret’s safe with me.', 'Seriously? Okay. I won’t tell a soul.', 'That changes things. Thanks for trusting me.']) };
     }
     case 'split': {
       adjTrust(botId, H, 0.05);
       const opts = candidates(botId, [H]).sort((x, y) => rawScore(botId, y) - rawScore(botId, x));
-      out = opts.length >= 2 ? `Smart, in case of an idol. ${nm(opts[0])} and ${nm(opts[1])}?` : 'Not enough of us left to split.';
-      break;
+      if (opts.length < 2) return { text: 'Not enough of us left to split.' };
+      return {
+        text: `Smart, in case of an idol. We split between ${nm(opts[0])} and ${nm(opts[1])}. Which one are you taking?`,
+        options: [
+          { label: nm(opts[0]), fx: () => { backingVote(botId, opts[0]); return `Okay. I’ll take ${nm(opts[1])} then.`; } },
+          { label: nm(opts[1]), fx: () => { backingVote(botId, opts[1]); return `Okay. I’ll take ${nm(opts[0])} then.`; } },
+          { label: 'All on one instead', fx: () => 'Your call. Just don’t get blindsided.' },
+        ],
+      };
     }
     case 'warn': {
-      if (target == null || target === botId) { out = 'Who?'; break; }
+      if (target == null || target === botId) return { text: 'Who?' };
       const real = s.plan[target] === botId;
       const closeness = s.trust[botId][target];
       adjTrust(botId, target, -(0.2 + Math.max(0, tr) * 0.3));
       s.influence[botId][target] += 0.3;
-      if (real) { adjTrust(botId, H, 0.15); out = say([`I KNEW it. ${nm(target)} has been acting weird.`, `Thank you. ${nm(target)} just made a big mistake.`]); }
-      else if (closeness > 0.4) { adjTrust(botId, H, -0.12); out = say([`${nm(target)}? I don't buy that.`, `Hm. That doesn't sound like ${nm(target)}. Why are you telling me this?`]); }
-      else out = say([`Really? Okay... I'll keep an eye on ${nm(target)}.`, `Noted. ${nm(target)} better watch it.`]);
       computePlans();
-      break;
+      if (real) { adjTrust(botId, H, 0.15); return { text: pick([`I KNEW it. ${nm(target)} has been acting weird.`, `Thank you. ${nm(target)} just made a big mistake.`]) }; }
+      if (closeness > 0.4) { adjTrust(botId, H, -0.12); return { text: pick([`${nm(target)}? I don’t buy that.`, `That doesn’t sound like ${nm(target)} at all.`]) }; }
+      return { text: pick([`Really. Okay. I’ll keep an eye on ${nm(target)}.`, `Noted. ${nm(target)} better watch it.`]) };
     }
-    default: out = freeReply(botId, freeText || '');
+    default: return freeReply(botId, freeText || '');
   }
-  return out;
 }
 
 function freeReply(botId, text) {
-  const s = S(), low = text.toLowerCase();
+  const low = text.toLowerCase();
   const named = alive().find((p) => !p.human && p.id !== botId && low.includes(p.name.toLowerCase()));
   if (/idol/.test(low)) return replyTo(botId, 'idol');
   if (named && /(vote|out|go home|target|get rid|blindside)/.test(low)) return replyTo(botId, 'voteout', named.id);
   if (/(alliance|work together|team up|final (two|2|three|3)|deal)/.test(low)) return replyTo(botId, 'ally');
   if (/trust/.test(low)) return replyTo(botId, 'trust');
   if (/(who|what).*(vot|think)/.test(low)) return replyTo(botId, 'who');
-  if (named) return pick([`What about ${named.name}?`, `${named.name}? Hm. I've been watching them too.`, `Careful talking about ${named.name} out loud.`]);
+  if (named) return { text: pick([`${named.name}? I’ve been watching them too.`, `Careful talking about ${named.name} out loud.`]) };
   adjTrust(botId, H, 0.02);
-  return pick(['Ha, yeah.', "Totally. It's hot out here 🥵", "I hear you.", "Let's talk more before tribal.", "Mm-hm. Interesting..."]);
+  return { text: pick(['Ha, yeah.', 'Totally. It’s brutal out here.', 'I hear you.', 'Mm-hm. Interesting.']) };
 }
 
 // Bots reaching out to the human on their own.
@@ -297,36 +367,113 @@ export function botConvo(forceWith) {
 // ------------------------------------------------------------------
 // Tribal Council talk
 // ------------------------------------------------------------------
-export function hostQuestion() {
-  const s = S(), al = alive(), immune = al.find((p) => p.immune);
-  const q = [];
-  if (immune) q.push({ to: immune.id, text: `${immune.name}, you're wearing the necklace tonight. Does that change the conversation?` });
-  const scared = al.filter((p) => !p.human).sort((x, y) => perceivedDanger(y.id) - perceivedDanger(x.id))[0];
-  if (scared) q.push({ to: scared.id, text: `${scared.name}, how safe do you feel tonight?` });
-  const b = pick(al.filter((p) => !p.human));
-  if (b) q.push({ to: b.id, text: `${b.name}, a lot of people were walking off in pairs today. What's going on out there?` });
-  q.push({ to: null, text: 'Is anybody worried about a hidden immunity idol tonight?' });
-  q.push({ to: H, text: `${nm(H)}, where do you stand going into this vote?` });
-  return pick(q);
+// Host-led questions. Each question is aimed at one castaway.
+export function buildQuestions(count) {
+  const s = S(), al = alive();
+  const immune = al.find((p) => p.immune && !p.human);
+  const bots = shuffle(aliveBots().filter((b) => !b.immune));
+  const types = shuffle(['safe', 'threat', 'trust', 'idol', 'decide']);
+  const qs = [];
+  if (immune) qs.push({ to: immune.id, type: 'immune' });
+  for (const b of bots) {
+    if (qs.length >= count - (P(H).alive ? 1 : 0)) break;
+    qs.push({ to: b.id, type: types[qs.length % types.length] });
+  }
+  if (P(H).alive) {
+    const myType = pick(['safe', 'threat', 'trust', 'idol', 'decide'].filter((t) => !qs.some((q) => q.type === t)) .concat(['decide']));
+    qs.splice(Math.min(qs.length, 1 + Math.floor(Math.random() * 2)), 0, { to: H, type: myType });
+  }
+  return qs.map((q) => ({ ...q, text: questionText(q.to, q.type) }));
 }
 
-export function botTribalLine(botId) {
-  const s = S(), b = P(botId), d = perceivedDanger(botId), plan = s.plan[botId];
-  const lines = [];
-  if (d > 0.4 && plan != null) {
-    lines.push(`I know my name's out there. But ${nm(plan)} is the one you should be worried about.`);
-    for (const k of aliveBots()) if (k.id !== botId) s.influence[k.id][plan] += 0.05;
+function questionText(id, type) {
+  const n = nm(id);
+  return {
+    safe: `${n}, how safe do you feel tonight?`,
+    threat: `${n}, who is the biggest threat left in this game?`,
+    trust: `${n}, is there anyone sitting here you don’t trust?`,
+    idol: `${n}, are you worried about a hidden immunity idol tonight?`,
+    decide: `${n}, what decides your vote tonight?`,
+    immune: `${n}, you’re wearing the necklace. Does that change anything tonight?`,
+  }[type];
+}
+
+/** A bot's public answer, with its effect already applied. May include a reaction from someone named. */
+export function botAnswer(botId, type) {
+  const s = S(), b = P(botId), others = alive().filter((p) => p.id !== botId);
+  const nudge = (x, amt) => { for (const k of aliveBots()) if (k.id !== botId && k.id !== x) s.influence[k.id][x] += amt; computePlans(); };
+  switch (type) {
+    case 'safe': {
+      const d = perceivedDanger(botId), plan = s.plan[botId];
+      if (d > 0.45 && plan != null) { nudge(plan, 0.06); return { text: `Honestly? No. I know my name has been thrown around. But ${nm(plan)} is the one you should all be worried about.`, reaction: plan !== H ? { who: plan, text: pick(['Here we go.', 'Nice try.']) } : null }; }
+      if (d < 0.25) return { text: pick(['I feel good. I trust my people.', 'Calm. I know exactly where I stand.']) };
+      return { text: 'Nobody is safe out here. I’m just trying to keep my head down.' };
+    }
+    case 'threat': {
+      const top = others.slice().sort((x, y) => s.threat[y.id] - s.threat[x.id])[0];
+      if (b.t.strategic > 0.45 && top) {
+        nudge(top.id, 0.06);
+        const why = top.stats.wins ? `${top.stats.wins} immunity win${top.stats.wins > 1 ? 's' : ''}. Do the math.` : 'Everyone likes them. That’s exactly the problem.';
+        return { text: `Easy. ${top.name}. ${why}`, reaction: top.human ? null : { who: top.id, text: pick(['I’ll take that as a compliment.', 'Wow. Okay.']) } };
+      }
+      return { text: 'At this point everyone is a threat. That’s the game.' };
+    }
+    case 'trust': {
+      const low = others.slice().sort((x, y) => s.trust[botId][x.id] - s.trust[botId][y.id])[0];
+      if (low && s.trust[botId][low.id] < 0) {
+        adjTrust(low.id, botId, -0.15);
+        nudge(low.id, 0.03);
+        return { text: `${low.name}. I just get a weird feeling.`, reaction: low.human ? null : { who: low.id, text: pick(['Good to know.', 'The feeling is mutual.']) } };
+      }
+      return { text: 'I trust my people. That’s all I’ll say.' };
+    }
+    case 'idol': {
+      if (b.idols) return { text: pick(['Nope. Not worried at all.', 'Worried? No. Should I be?']) };
+      const sus = others.slice().sort((x, y) => s.idolSusp[y.id] - s.idolSusp[x.id])[0];
+      if (sus && s.idolSusp[sus.id] > 0.3) { s.idolSusp[sus.id] = Math.min(1, s.idolSusp[sus.id] + 0.05); return { text: `If anyone has one, it’s ${sus.name}. Way too much time in the jungle.` }; }
+      return { text: 'Always. That’s why you never put every vote on one name.' };
+    }
+    case 'decide': {
+      const t = b.t;
+      if (t.loyal >= t.strategic && t.loyal >= t.social) return { text: 'Loyalty. I’m voting with the people who’ve been loyal to me.' };
+      if (t.strategic >= t.social) return { text: 'Strategy. Who is the biggest threat to win at the end.' };
+      return { text: 'My gut. Who’s been honest with me and who hasn’t.' };
+    }
+    case 'immune': return { text: pick(['It means I get to vote with a clear head. Somebody here should be nervous.', 'It means tonight I’m the one making decisions.']) };
   }
-  if (d < 0.25) lines.push(pick(['I feel good tonight. I trust my people.', "I'm calm. I know where I stand.", "Honestly? I'm not worried."]));
-  if (b.t.strategic > 0.6) {
-    const w = alive().filter((p) => p.id !== botId).sort((x, y) => y.stats.wins - x.stats.wins)[0];
-    if (w && w.stats.wins > 0) lines.push(`This vote is about who can win. ${w.name} has ${w.stats.wins} immunity win${w.stats.wins > 1 ? 's' : ''}. Think about that.`);
+  return { text: '...' };
+}
+
+/** Multiple-choice answers for the human. Choices with `pick` ask for a name first. */
+export function humanChoices(type) {
+  const s = S();
+  const lead = (lineId) => (target) => applyTribalLine(lineId, target);
+  switch (type) {
+    case 'safe': return [
+      { label: 'I feel good. I trust my people.', fx: lead('loyal') },
+      { label: 'Nobody is safe tonight.', fx: lead('idolwarn') },
+      { label: 'Honestly? I’m nervous.', fx: lead('plead') },
+    ];
+    case 'threat': return [
+      { label: '{X}. It’s obvious.', pick: true, fx: lead('threat') },
+      { label: 'Everyone is a threat now.', fx: () => null },
+    ];
+    case 'trust': return [
+      { label: '{X}. I don’t buy a word they say.', pick: true, fx: lead('liar') },
+      { label: 'I trust everyone here.', fx: lead('loyal') },
+    ];
+    case 'idol': return [
+      { label: 'Somebody definitely has one.', fx: lead('idolwarn') },
+      { label: 'Not really.', fx: () => null },
+      { label: 'If I had one, I wouldn’t tell you.', fx: () => { s.idolSusp[H] = clamp(s.idolSusp[H] + 0.2, 0, 1); for (const b of aliveBots()) s.influence[b.id][H] -= 0.12; computePlans(); return { who: pick(aliveBots()).id, text: '...Noted.' }; } },
+    ];
+    case 'decide': return [
+      { label: 'Loyalty. I’m sticking with my people.', fx: lead('loyal') },
+      { label: 'Keeping it simple tonight: {X}.', pick: true, fx: lead('simple') },
+      { label: 'Taking out whoever I can’t beat at the end.', fx: () => { s.threat[H] += 0.04; computePlans(); return null; } },
+    ];
   }
-  if (b.t.honesty < 0.35) lines.push(pick(['Some people are playing both sides. You know who you are.', "Everyone's smiling at camp. That's what scares me."]));
-  if (s.idolSusp[H] > 0.35 && chance(0.5)) lines.push(`I'll just say it. ${nm(H)} has been on an idol hunt all day.`);
-  if (s.voteHistory.length) lines.push(pick(['Last vote showed us exactly who is running this game.', 'The last vote changed everything.']));
-  lines.push(pick(["It's a numbers game. Simple as that.", 'Whatever happens, I came here to play.', 'I just hope people vote with their gut.']));
-  return pick(lines);
+  return [{ label: 'I’ll let my vote speak for me.', fx: () => null }];
 }
 
 export function applyTribalLine(lineId, target) {

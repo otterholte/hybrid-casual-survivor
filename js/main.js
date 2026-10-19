@@ -1,74 +1,106 @@
-// App entry: menus, season loop, jury spectating and the end screen.
-import { h, $, sleep, pick, shuffle, store } from './util.js';
+// App entry: menus, character creator, season loop, jury spectating and the end screen.
+import { h, $, pick, shuffle, store } from './util.js';
 import { audio, sfx } from './audio.js';
-import { show, banner, setScene, setMusic, avatarChip, modal } from './ui.js';
-import { avatarSVG, SKINS, HAIRS, HAIR_STYLES, BUFFS } from './avatar.js';
+import { show, banner, setScene, setMusic, avatarChip, modal, setPausable, openPause } from './ui.js';
+import { avatarSVG, randomLook, SKINS, HAIRS, HAIR_STYLES, HAIR_LABELS, BUFFS, FACES, EYES, EYE_COLORS, BROWS, NOSES, MOUTHS, FACIAL } from './avatar.js';
 import { ARCHETYPES, PLAYER_JOBS } from './data.js';
-import { game, newSeason, alive, aliveBots, human, P, nm } from './state.js';
+import { game, newSeason, alive, human, P, nm } from './state.js';
 import { beginRoundAI, computePlans } from './ai.js';
 import { CHALLENGES, byId, runChallenge, simulateChallenge } from './challenges/index.js';
 import { runCamp, simulateCamp, hideIdolIfNeeded } from './camp.js';
 import { runTribal, simulateTribal } from './tribal.js';
 import { finalTribal } from './finale.js';
 
-const DEFAULTS = { name: '', castSize: 8, difficulty: 'normal', pace: 'classic', look: { skin: 1, hair: 1, style: 0, buff: 0 } };
-let settings = { ...DEFAULTS, ...store.get('ic_settings', {}) };
+const DEFAULTS = { name: '', castSize: 8, difficulty: 'normal', campTimer: 0, look: randomLook('m') };
+let settings = { ...DEFAULTS, ...store.get('ic_settings2', {}) };
 settings.look = { ...DEFAULTS.look, ...(settings.look || {}) };
-const saveSettings = () => store.set('ic_settings', settings);
+const saveSettings = () => store.set('ic_settings2', settings);
 
 // ---------- global chrome ----------
 const muteBtn = $('#muteBtn');
 const paintMute = () => (muteBtn.textContent = audio.muted ? '🔇' : '🔊');
 paintMute();
 muteBtn.addEventListener('click', () => { audio.init(); audio.setMuted(!audio.muted); paintMute(); });
-const unlock = () => { audio.init(); };
+$('#pauseBtn').addEventListener('click', () => openPause({ onHowTo: howTo }));
+window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.body.classList.contains('pausable')) openPause({ onHowTo: howTo }); });
+const unlock = () => audio.init();
 window.addEventListener('pointerdown', unlock, { capture: true });
 window.addEventListener('keydown', unlock, { capture: true });
 
 // ---------- title ----------
 function titleScreen() {
+  setPausable(false);
   setScene('day');
   setMusic('title', 'beach');
   const rec = store.get('ic_record', { played: 0, won: 0 });
+  const faces = [randomLook('f'), randomLook('m'), randomLook('f'), randomLook('m'), randomLook('f')];
   show(h('div', { class: 'screen title' },
     h('div', { class: 'logo' },
-      h('div', { class: 'logo-torches' }, h('span', { class: 'mini-torch' }, h('i')), h('span', { class: 'mini-torch' }, h('i'))),
+      h('div', { class: 'logo-fire' }, h('span', { class: 'mini-torch' }, h('i')), h('span', { class: 'mini-torch' }, h('i'))),
       h('div', { class: 'logo-top' }, 'ISLAND'),
       h('div', { class: 'logo-bot' }, 'COUNCIL'),
-      h('div', { class: 'logo-tag' }, 'Win challenges · Make alliances · Survive the vote')),
-    h('div', { class: 'title-cast', html: shuffle([0, 1, 2, 3, 4]).map((i) => avatarSVG({ skin: i, hair: i + 2, style: i * 2, buff: i }, { size: 62, expr: pick(['happy', 'smug', 'neutral']) })).join('') }),
+      h('div', { class: 'logo-tag' }, 'Win immunity. Build alliances. Survive the vote.')),
+    h('div', { class: 'title-cast' }, ...faces.map((l) => h('div', { class: 'chip-face', style: { width: '58px', height: '58px' }, html: avatarSVG(l, { size: 58, expr: pick(['neutral', 'smug', 'neutral']) }) }))),
     h('div', { class: 'stack menu' },
-      h('button', { class: 'btn btn-orange btn-big', onclick: () => { sfx('click'); setupScreen(); } }, '🏝️ Play Solo Season'),
-      h('button', { class: 'btn btn-teal', onclick: () => { sfx('click'); practiceScreen(); } }, '🎯 Practice Challenges'),
-      h('button', { class: 'btn btn-ghost', onclick: () => { sfx('click'); howTo(); } }, '📜 How to Play'),
-      h('button', { class: 'btn btn-ghost disabled', title: 'Coming soon', onclick: () => { sfx('fail'); banner({ title: 'Group play is coming soon', sub: 'For now, play a solo season against bots who scheme, lie and vote just like friends would.', icon: '👥', tap: true }); } }, '👥 Play With Friends (soon)')),
-    rec.played ? h('div', { class: 'record' }, `Seasons played: ${rec.played} · Crowns won: ${rec.won} 👑`) : null,
+      h('button', { class: 'btn btn-big', onclick: () => { sfx('click'); setupScreen(); } }, 'Play Solo Season'),
+      h('button', { class: 'btn btn-dark', onclick: () => { sfx('click'); practiceScreen(); } }, 'Practice Challenges'),
+      h('button', { class: 'btn btn-ghost', onclick: () => { sfx('click'); howTo(); } }, 'How to Play'),
+      h('button', { class: 'btn btn-ghost', style: { opacity: '.6' }, onclick: () => { sfx('click'); banner({ title: 'Group play is coming', sub: 'For now, play a solo season against castaways who scheme, lie and vote like real players.', icon: '👥', tap: true }); } }, 'Play With Friends · Soon')),
+    rec.played ? h('div', { class: 'record' }, `Seasons played: ${rec.played} · Titles won: ${rec.won}`) : null,
   ));
 }
 
 function howTo() {
   const box = h('div', { class: 'howto' },
-    h('div', { class: 'display sm' }, 'How to Play'),
+    h('div', { class: 'display sm fire' }, 'How to Play'),
     h('ol', {},
-      h('li', {}, h('b', {}, '📿 Immunity Challenge: '), 'a quick skill game. Win and you can’t be voted out tonight.'),
-      h('li', {}, h('b', {}, '🏝️ Back at Camp: '), 'a timed phase. Hunt for idols, message castaways, or spy on conversations. Every second you spend on one thing is time you don’t spend on another.'),
-      h('li', {}, h('b', {}, '🔥 Tribal Council: '), 'talk it out, then cast a secret vote. Idols are played before votes are read.'),
-      h('li', {}, h('b', {}, '⚖️ The Jury: '), 'everyone voted out joins the jury and picks the winner at Final Tribal. Betray them and they will remember.')),
-    h('p', { class: 'muted' }, 'Bots lie. Promises aren’t binding. Watch who keeps their word.'),
-    h('button', { class: 'btn btn-orange', onclick: () => box.close() }, 'Got it'));
+      h('li', {}, h('b', {}, 'Immunity: '), 'win a quick skill challenge and you can’t be voted out tonight. The winner wears the necklace.'),
+      h('li', {}, h('b', {}, 'Camp: '), 'you get two actions. Have a private strategy talk, spy on someone, or search for a hidden immunity idol. Messages castaways send you are free to answer.'),
+      h('li', {}, h('b', {}, 'Tribal Council: '), 'the host questions the tribe, then everyone votes in secret. Idols are played before the votes are read.'),
+      h('li', {}, h('b', {}, 'The Jury: '), 'everyone voted out becomes a juror and picks the winner at Final Tribal. They remember who betrayed them.')),
+    h('p', { class: 'muted' }, 'Tap the pause button in the corner any time during a season.'),
+    h('button', { class: 'btn', onclick: () => box.close() }, 'Got it'));
   modal(box);
 }
 
 // ---------- setup ----------
 function setupScreen() {
+  setPausable(false);
   setScene('day');
+  const L = settings.look;
   const preview = h('div', { class: 'setup-face' });
-  const paint = () => (preview.innerHTML = avatarSVG(settings.look, { size: 130, expr: 'happy' }));
-  paint();
-  const cycler = (label, key, arr) => h('div', { class: 'cycler' },
-    h('button', { class: 'cyc', onclick: () => { settings.look[key] = (settings.look[key] - 1 + arr.length) % arr.length; sfx('click'); paint(); } }, '‹'),
-    h('span', {}, label),
-    h('button', { class: 'cyc', onclick: () => { settings.look[key] = (settings.look[key] + 1) % arr.length; sfx('click'); paint(); } }, '›'));
+  const paint = () => preview.replaceChildren(h('div', { class: 'chip-face', style: { width: '150px', height: '150px' }, html: avatarSVG(L, { size: 150 }) }));
+  const cyclers = h('div', { class: 'cyclers' });
+  const fields = [
+    ['Skin', 'skin', SKINS.length, (i) => `Tone ${i + 1}`],
+    ['Face shape', 'face', FACES.length, (i) => FACES[i]],
+    ['Eyes', 'eyes', EYES.length, (i) => EYES[i]],
+    ['Eye color', 'eyeColor', EYE_COLORS.length, (i) => ['Brown', 'Hazel', 'Blue', 'Green', 'Gray'][i]],
+    ['Brows', 'brows', BROWS.length, (i) => BROWS[i]],
+    ['Nose', 'nose', NOSES.length, (i) => NOSES[i]],
+    ['Mouth', 'mouth', MOUTHS.length, (i) => MOUTHS[i]],
+    ['Hair style', 'style', HAIR_STYLES.length, (i) => HAIR_LABELS[i]],
+    ['Hair color', 'hair', HAIRS.length, (i) => `Shade ${i + 1}`],
+    ['Facial hair', 'facial', FACIAL.length, (i) => FACIAL[i]],
+    ['Buff color', 'buff', BUFFS.length, (i) => `Color ${i + 1}`],
+  ];
+  const paintCyclers = () => cyclers.replaceChildren(...fields.map(([label, key, n, name]) => {
+    const val = h('small', {}, name(((L[key] ?? 0) % n + n) % n));
+    const step = (d) => { L[key] = (((L[key] ?? 0) + d) % n + n) % n; sfx('click'); paint(); val.textContent = name(L[key]); };
+    return h('div', { class: 'cycler' },
+      h('button', { class: 'cyc', onclick: () => step(-1) }, '‹'),
+      h('span', {}, label, val),
+      h('button', { class: 'cyc', onclick: () => step(1) }, '›'));
+  }));
+  const genderSeg = h('div', { class: 'seg' });
+  const paintGender = () => genderSeg.replaceChildren(...[['m', 'Man'], ['f', 'Woman']].map(([g, lab]) => h('button', {
+    class: L.gender === g ? 'on' : '', onclick: () => {
+      if (L.gender === g) return;
+      Object.assign(L, randomLook(g), { skin: L.skin, eyeColor: L.eyeColor, buff: L.buff });
+      sfx('click'); paint(); paintGender(); paintCyclers();
+    },
+  }, lab)));
+  paint(); paintGender(); paintCyclers();
   const seg = (key, opts) => {
     const wrap = h('div', { class: 'seg' });
     const render = () => wrap.replaceChildren(...opts.map(([v, lab]) => h('button', { class: settings[key] === v ? 'on' : '', onclick: () => { settings[key] = v; sfx('click'); render(); } }, lab)));
@@ -77,42 +109,47 @@ function setupScreen() {
   };
   const nameIn = h('input', { class: 'name-in', placeholder: 'Your castaway name', maxlength: 12, value: settings.name || '' });
   show(h('div', { class: 'screen setup' },
+    h('div', { class: 'eyebrow' }, 'NEW SEASON'),
     h('div', { class: 'display' }, 'Create Your Castaway'),
-    h('div', { class: 'card setup-card' },
+    h('div', { class: 'panel setup-card' },
       preview,
-      h('div', { class: 'cyclers' }, cycler('Skin', 'skin', SKINS), cycler('Hair color', 'hair', HAIRS), cycler('Hair style', 'style', HAIR_STYLES), cycler('Buff', 'buff', BUFFS)),
-      nameIn),
-    h('div', { class: 'card setup-card' },
-      h('div', { class: 'opt-lab' }, 'Castaways'), seg('castSize', [[6, '6 · ~18 min'], [8, '8 · ~28 min'], [10, '10 · ~40 min']]),
+      genderSeg,
+      nameIn,
+      cyclers,
+      h('button', { class: 'btn btn-ghost sm', onclick: () => { Object.assign(L, randomLook(L.gender)); sfx('click'); paint(); paintCyclers(); } }, '🎲 Randomize look')),
+    h('div', { class: 'panel setup-card' },
+      h('div', { class: 'opt-lab' }, 'Castaways'), seg('castSize', [[6, '6 · ~20 min'], [8, '8 · ~30 min'], [10, '10 · ~40 min']]),
       h('div', { class: 'opt-lab' }, 'Challenge difficulty'), seg('difficulty', [['easy', 'Easy'], ['normal', 'Normal'], ['hard', 'Hard']]),
-      h('div', { class: 'opt-lab' }, 'Season pace'), seg('pace', [['classic', 'Classic'], ['blitz', 'Blitz (double boots)']])),
+      h('div', { class: 'opt-lab' }, 'Camp time limit'), seg('campTimer', [[0, 'None'], [120, '2 min'], [180, '3 min']])),
     h('div', { class: 'row' },
-      h('button', { class: 'btn btn-ghost', onclick: () => { sfx('click'); titleScreen(); } }, '← Back'),
-      h('button', { class: 'btn btn-orange btn-big grow', onclick: () => {
+      h('button', { class: 'btn btn-ghost', onclick: () => { sfx('click'); saveSettings(); titleScreen(); } }, 'Back'),
+      h('button', { class: 'btn btn-big grow', onclick: () => {
         settings.name = (nameIn.value.trim() || 'Castaway').slice(0, 12);
         saveSettings();
         sfx('click');
         playSeason();
-      } }, 'Start the Season!')),
+      } }, 'Start the Season')),
   ));
 }
 
 // ---------- practice ----------
 function practiceScreen() {
+  setPausable(false);
   setScene('day');
   setMusic('title', 'beach');
   const me = { id: 0, human: true, name: settings.name || 'You', look: settings.look, alive: true, t: {} };
   show(h('div', { class: 'screen practice' },
+    h('div', { class: 'eyebrow' }, 'TRAINING GROUNDS'),
     h('div', { class: 'display' }, 'Practice'),
-    h('p', { class: 'muted center' }, 'Learn the challenges before the game is on the line.'),
+    h('p', { class: 'muted center' }, 'Learn the challenges before your life in the game is on the line.'),
     h('div', { class: 'practice-grid' }, ...CHALLENGES.map((c) => {
       const best = store.get(`ic_best_${c.id}_${settings.difficulty}`, null);
-      return h('button', { class: 'practice-card', onclick: async () => { sfx('click'); await runChallenge({ ch: c, players: [me], diff: settings.difficulty, practice: true }); practiceScreen(); } },
+      return h('button', { class: 'practice-card', onclick: async () => { sfx('click'); setPausable(true); await runChallenge({ ch: c, players: [me], diff: settings.difficulty, practice: true }); practiceScreen(); } },
         h('div', { class: 'pc-ic' }, c.icon), h('div', { class: 'pc-n' }, c.name),
         h('div', { class: 'pc-s' }, best != null ? `Best: ${best.toFixed(1)}s` : c.mode === 'race' ? 'Race' : 'Endurance'));
     })),
     h('div', { class: 'muted center' }, `Difficulty: ${settings.difficulty} (change it in season setup)`),
-    h('button', { class: 'btn btn-ghost', onclick: () => { sfx('click'); titleScreen(); } }, '← Back'),
+    h('button', { class: 'btn btn-ghost', onclick: () => { sfx('click'); titleScreen(); } }, 'Back'),
   ));
 }
 
@@ -133,7 +170,8 @@ function nextChallenge(final) {
 }
 
 async function playSeason() {
-  const S = newSeason({ ...settings, job: pick(PLAYER_JOBS) });
+  const S = newSeason({ ...settings, look: { ...settings.look }, job: pick(PLAYER_JOBS) });
+  setPausable(true);
   challengeBag = [];
   await castReveal();
   let fast = false;
@@ -151,14 +189,11 @@ async function playSeason() {
     let res;
     if (!S.humanOut) {
       setScene('day');
-      await banner({ title: `DAY ${S.day}`, sub: final ? 'The final four. One last necklace.' : pick(['The sun rises on a hungry tribe.', 'Come on in, castaways!', 'Rain overnight. Spirits are low.', 'Another day in paradise...']), icon: '🌅', tone: 'sun', hold: 1800 });
+      sfx('boom');
+      await banner({ title: `DAY ${S.day}`, sub: final ? 'Final four. One last necklace.' : pick(['The tide is turning.', 'Hunger is setting in.', 'Rain all night. Tempers are short.', 'Somebody is lying. Nobody knows who.']), tone: 'sunset', hold: 2400 });
       res = await runChallenge({ ch, players: alive(), diff: S.settings.difficulty, final });
     } else {
       res = simulateChallenge(ch, alive(), S.settings.difficulty);
-      if (!fast) {
-        setScene('day');
-        await banner({ title: `DAY ${S.day}: ${ch.name}`, sub: `${nm(res.winner)} wins ${final ? 'the FINAL' : ''} immunity!`, icon: `${ch.icon}`, tone: 'sun', tap: true });
-      }
     }
     const w = P(res.winner);
     w.immune = true;
@@ -166,6 +201,10 @@ async function playSeason() {
     S.threat[w.id] += 0.2;
     S.lastWinner = w.id;
     computePlans();
+    if (S.humanOut && !fast) {
+      setScene('day');
+      await banner({ title: `${w.name} wins immunity`, sub: `Day ${S.day} · ${ch.name}${final ? ' · Final immunity' : ''}`, icon: avatarSVG(w.look, { size: 120, expr: 'happy', necklace: true }), tone: 'gold', tap: true });
+    }
 
     // ----- camp -----
     if (!S.humanOut) await runCamp();
@@ -175,23 +214,11 @@ async function playSeason() {
     }
 
     // ----- tribal -----
-    const doDouble = S.settings.pace === 'blitz' && !S.didDouble && S.round >= 2 && alive().length >= 7;
-    let out;
-    if (fast) out = simulateTribal().out;
-    else out = await runTribal({ juror: S.humanOut });
+    const out = fast ? simulateTribal().out : await runTribal({ juror: S.humanOut });
     if (out === 0) fast = await humanVotedOut();
-    if (doDouble && alive().length > 4) {
-      S.didDouble = true;
-      if (!fast) await banner({ title: 'WAIT!', sub: 'This is a <b>double elimination</b>. A second castaway goes home tonight.', icon: '⚡', tone: 'night', tap: true });
-      let out2;
-      if (fast) out2 = simulateTribal().out;
-      else out2 = await runTribal({ juror: S.humanOut, second: true });
-      if (out2 === 0) fast = await humanVotedOut();
-    }
   }
 
   if (fast) await recap();
-  S.day += 3;
   const { winner } = await finalTribal();
   const rec = store.get('ic_record', { played: 0, won: 0 });
   rec.played++;
@@ -207,17 +234,17 @@ async function castReveal() {
   sfx('conch');
   await new Promise((go) => show(h('div', { class: 'screen cast' },
     h('div', { class: 'eyebrow' }, 'DAY 1 · THE MAROONING'),
-    h('div', { class: 'display' }, `${S.players.length} Strangers. 1 Champion.`),
-    h('div', { class: 'cast-grid' }, ...S.players.map((p) => {
+    h('div', { class: 'display fire' }, `${S.players.length} Strangers. 1 Champion.`),
+    h('div', { class: 'cast-grid' }, ...S.players.map((p, i) => {
       const a = p.arch ? ARCHETYPES[p.arch] : null;
-      return h('div', { class: `cast-card ${p.human ? 'me' : ''}` },
-        h('div', { html: avatarSVG(p.look, { size: 64, expr: p.human ? 'happy' : pick(['happy', 'smug', 'neutral']) }) }),
+      return h('div', { class: `cast-card ${p.human ? 'me' : ''}`, style: { animationDelay: `${i * 70}ms` } },
+        h('div', { class: 'chip-face', style: { width: '66px', height: '66px' }, html: avatarSVG(p.look, { size: 66, expr: p.human ? 'happy' : pick(['neutral', 'smug', 'neutral']) }) }),
         h('div', { class: 'cc-name' }, p.human ? `${p.name} (you)` : p.name),
         h('div', { class: 'cc-job' }, p.job),
         a ? h('div', { class: 'cc-arch' }, `${a.emoji} ${a.label}`) : h('div', { class: 'cc-arch' }, '⭐ That’s you'));
     })),
     h('p', { class: 'muted center' }, 'Everyone voted out joins the jury. At the end, the jury crowns the Island Champion.'),
-    h('button', { class: 'btn btn-orange btn-big', onclick: () => { sfx('click'); go(); } }, 'Let the game begin!'))));
+    h('button', { class: 'btn btn-big', onclick: () => { sfx('click'); go(); } }, 'Let the game begin'))));
 }
 
 async function juryLounge(sim) {
@@ -227,40 +254,39 @@ async function juryLounge(sim) {
     h('div', { class: 'eyebrow' }, `DAY ${game.S.day} · JURY LOUNGE`),
     h('div', { class: 'display sm' }, 'You see everything now'),
     h('p', { class: 'muted center' }, 'As a juror you can read every camp conversation.'),
-    h('div', { class: 'card lounge-log' },
+    h('div', { class: 'panel lounge-log' },
       ...sim.msgs.map((m) => h('div', { class: 'spy-msg' }, h('span', { class: 'mini', html: avatarSVG(P(m.from).look, { size: 24 }) }), h('b', {}, nm(m.from)), ' → ', h('b', {}, nm(m.to)), h('div', {}, `“${m.text}”`))),
       sim.finder ? h('div', { class: 'spy-msg gold' }, `🗿 ${sim.finder.name} found a hidden immunity idol!`) : null),
-    h('button', { class: 'btn btn-orange', onclick: () => { sfx('click'); go(); } }, 'Off to Tribal Council'))));
+    h('button', { class: 'btn', onclick: () => { sfx('click'); go(); } }, 'Off to Tribal Council'))));
 }
 
 async function humanVotedOut() {
   const S = game.S, me = human();
   setMusic(null);
-  sfx('fail');
   return new Promise((resolve) => show(h('div', { class: 'screen out' },
-    h('div', { class: 'out-face', html: avatarSVG(me.look, { size: 140, expr: 'sad' }) }),
-    h('div', { class: 'display' }, 'The island has spoken.'),
-    h('p', { class: 'center' }, `You finished in ${ordinal(me.placement)} place out of ${S.players.length}.`),
-    h('div', { class: 'card stats' },
+    h('div', { class: 'out-face' }, h('div', { class: 'chip-face', style: { width: '140px', height: '140px', filter: 'grayscale(.6)' }, html: avatarSVG(me.look, { size: 140, expr: 'sad' }) })),
+    h('div', { class: 'display fire' }, 'The island has spoken.'),
+    h('p', { class: 'center' }, `You finished ${ordinal(me.placement)} out of ${S.players.length}.`),
+    h('div', { class: 'stats' },
       stat('📿', 'Immunity wins', me.stats.wins), stat('🗳️', 'Votes against you', me.stats.votesAgainst),
       stat('🗿', 'Idols found', me.stats.idolsFound), stat('🎯', 'Correct votes', me.stats.correctVotes)),
-    h('p', { class: 'muted center' }, 'But it’s not over: you’re on the jury, and you’ll help pick the winner.'),
+    h('p', { class: 'muted center' }, 'It’s not over. You’re on the jury and you’ll help pick the winner.'),
     h('div', { class: 'stack' },
-      h('button', { class: 'btn btn-orange btn-big', onclick: () => { sfx('click'); resolve(false); } }, '🪑 Watch from the Jury'),
-      h('button', { class: 'btn btn-ghost', onclick: () => { sfx('click'); resolve(true); } }, '⏩ Skip to the Finale')))));
+      h('button', { class: 'btn btn-big', onclick: () => { sfx('click'); resolve(false); } }, 'Watch from the Jury'),
+      h('button', { class: 'btn btn-ghost', onclick: () => { sfx('click'); resolve(true); } }, 'Skip to the Finale')))));
 }
 
 async function recap() {
   const S = game.S;
   setScene('camp');
   await new Promise((go) => show(h('div', { class: 'screen lounge' },
-    h('div', { class: 'display sm' }, 'Previously on Island Council...'),
-    h('div', { class: 'card lounge-log' }, ...S.voteHistory.map((v) => {
+    h('div', { class: 'display sm' }, 'Previously on Island Council'),
+    h('div', { class: 'panel lounge-log' }, ...S.voteHistory.map((v) => {
       const n = Object.values(v.votes).filter((t) => t === v.out).length;
       return h('div', { class: 'spy-msg' }, h('span', { class: 'mini', html: avatarSVG(P(v.out).look, { size: 24, expr: 'sad' }) }), `Day ${v.day}: `, h('b', {}, nm(v.out)), ` voted out (${n} vote${n === 1 ? '' : 's'})`);
     })),
     h('p', { class: 'center' }, `Final three: ${alive().map((p) => p.name).join(', ')}`),
-    h('button', { class: 'btn btn-orange', onclick: () => { sfx('click'); go(); } }, 'To Final Tribal Council'))));
+    h('button', { class: 'btn', onclick: () => { sfx('click'); go(); } }, 'To Final Tribal Council'))));
 }
 
 const ordinal = (n) => n + (['th', 'st', 'nd', 'rd'][(n % 100 > 10 && n % 100 < 14) ? 0 : n % 10] || 'th');
@@ -268,26 +294,27 @@ const stat = (ic, lab, v) => h('div', { class: 'stat' }, h('span', { class: 'st-
 
 function endScreen(winnerId) {
   const S = game.S, me = human();
+  setPausable(false);
   setScene('day');
   setMusic('title', 'beach');
   const ranked = S.players.slice().sort((a, b) => (a.placement || 99) - (b.placement || 99));
   const won = winnerId === 0;
   show(h('div', { class: 'screen end' },
     h('div', { class: 'eyebrow' }, 'SEASON COMPLETE'),
-    h('div', { class: 'end-hero', html: `<div class="crown">👑</div>${avatarSVG(P(winnerId).look, { size: 120, expr: 'happy' })}` }),
-    h('div', { class: 'display' }, won ? 'You won the season!' : `${nm(winnerId)} wins!`),
-    h('div', { class: 'card stats' },
+    h('div', { class: 'end-hero' }, h('div', { class: 'crown' }, '👑'), h('div', { class: 'chip-face', style: { width: '120px', height: '120px', borderColor: 'var(--gold)' }, html: avatarSVG(P(winnerId).look, { size: 120, expr: 'happy' }) })),
+    h('div', { class: 'display fire' }, won ? 'You won the season!' : `${nm(winnerId)} wins!`),
+    h('div', { class: 'stats' },
       stat('🏅', 'Your finish', ordinal(me.placement || 1)), stat('📿', 'Immunity wins', me.stats.wins),
       stat('🗿', 'Idols found', me.stats.idolsFound), stat('🛡️', 'Idol saves', me.stats.idolSaves),
       stat('🎯', 'Correct votes', me.stats.correctVotes), stat('🐍', 'Broken promises', me.stats.betrayals)),
-    h('div', { class: 'card standings' }, h('div', { class: 'feed-title' }, 'Final standings'),
+    h('div', { class: 'panel standings' }, h('div', { class: 'feed-title' }, 'FINAL STANDINGS'),
       ...ranked.map((p) => h('div', { class: `stand-row ${p.human ? 'me' : ''}` },
         h('span', { class: 'sr-place' }, ordinal(p.placement || 1)),
-        h('span', { html: avatarSVG(p.look, { size: 30, expr: p.placement === 1 ? 'happy' : 'neutral' }) }),
+        h('span', { class: 'mini', html: avatarSVG(p.look, { size: 30, expr: p.placement === 1 ? 'happy' : 'neutral' }) }),
         h('span', { class: 'sr-name' }, p.human ? `${p.name} (you)` : p.name),
         h('span', { class: 'sr-info' }, `📿${p.stats.wins} · 🗳️${p.stats.votesAgainst}`)))),
     h('div', { class: 'stack' },
-      h('button', { class: 'btn btn-orange btn-big', onclick: () => { sfx('click'); playSeason(); } }, 'Play another season'),
+      h('button', { class: 'btn btn-big', onclick: () => { sfx('click'); playSeason(); } }, 'Play another season'),
       h('button', { class: 'btn btn-ghost', onclick: () => { sfx('click'); titleScreen(); } }, 'Main menu')),
   ));
 }

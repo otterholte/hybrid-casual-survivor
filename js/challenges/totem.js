@@ -120,7 +120,7 @@ export default {
         g.lineWidth = 3;
         g.beginPath(); g.moveTo(20, gy); g.lineTo(380, gy); g.stroke();
         g.setLineDash([]);
-        g.fillStyle = '#fff'; g.font = '16px "Luckiest Guy", sans-serif'; g.textAlign = 'left';
+        g.fillStyle = '#fff'; g.font = '20px "Bebas Neue", sans-serif'; g.textAlign = 'left';
         g.fillText('GOAL', 22, gy - 6);
         tiers.forEach((tr, i) => drawBlock(g, tr.x, yOf(i), tr.w, tr.c));
         for (const d of debris) drawBlock(g, d.x, d.y, d.w, d.c, d.rot);
@@ -133,10 +133,10 @@ export default {
           g.fillRect(mover.x - mover.w / 2, my + TH, mover.w, yOf(tiers.length) - my - TH);
         }
         if (falling) drawBlock(g, falling.x, falling.y, falling.w, falling.c);
-        g.fillStyle = '#fff'; g.font = '22px "Luckiest Guy", sans-serif'; g.textAlign = 'center';
+        g.fillStyle = '#fff'; g.font = '26px "Bebas Neue", sans-serif'; g.textAlign = 'center';
         g.fillText(`${tiers.length - 1} / ${goal}`, 200, 34);
         if (t < 4 && tiers.length === 1) {
-          g.font = '18px "Luckiest Guy", sans-serif';
+          g.font = '22px "Bebas Neue", sans-serif';
           g.fillText('TAP TO DROP', 200, 650 - Math.abs(Math.sin(t * 3)) * 5);
         }
       },

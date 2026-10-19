@@ -1,5 +1,5 @@
-// Screen switching, overlays, toasts, timers and avatar chips.
-import { $, h, sleep } from './util.js';
+// Screen switching, overlays, toasts, timers, avatar chips and the pause menu.
+import { $, h, sleep, clock } from './util.js';
 import { avatarSVG } from './avatar.js';
 import { sfx, audio } from './audio.js';
 
@@ -18,52 +18,53 @@ export function show(el) {
 export function toast(html, kind = '') {
   const t = h('div', { class: `toast ${kind}`, html });
   $('#toasts').append(t);
-  setTimeout(() => t.classList.add('out'), 2600);
-  setTimeout(() => t.remove(), 3100);
+  setTimeout(() => t.classList.add('out'), 3200);
+  setTimeout(() => t.remove(), 3700);
 }
 
-/** Full-screen dramatic title card. Resolves on tap or after `hold` ms. */
-export function banner({ title, sub = '', icon = '', tone = 'sun', hold = 2400, tap = false, button }) {
+/** Full-screen cinematic title card. Resolves on tap or after `hold` ms. */
+export function banner({ title, sub = '', icon = '', tone = 'sun', hold = 2600, tap = false, button }) {
   return new Promise((resolve) => {
     const ov = $('#overlay');
     const card = h('div', { class: `banner tone-${tone}` },
       icon ? h('div', { class: 'banner-icon', html: icon }) : null,
       h('div', { class: 'banner-title' }, title),
       sub ? h('div', { class: 'banner-sub', html: sub }) : null,
-      button ? h('button', { class: 'btn btn-orange banner-btn' }, button) : null,
-      tap && !button ? h('div', { class: 'banner-tap' }, 'tap to continue') : null,
+      button ? h('button', { class: 'btn banner-btn' }, button) : null,
+      tap && !button ? h('div', { class: 'banner-tap' }, 'Tap to continue') : null,
     );
-    const wrap = h('div', { class: 'banner-wrap' }, card);
+    const wrap = h('div', { class: `banner-wrap tone-${tone}` }, h('div', { class: 'letterbox top' }), card, h('div', { class: 'letterbox bot' }));
     ov.append(wrap);
     let done = false;
     const finish = () => {
       if (done) return;
       done = true;
       wrap.classList.add('out');
-      setTimeout(() => { wrap.remove(); resolve(); }, 350);
+      setTimeout(() => { wrap.remove(); resolve(); }, 380);
     };
-    if (tap || button) {
-      setTimeout(() => wrap.addEventListener('click', () => { sfx('click'); finish(); }), 500);
-    } else setTimeout(finish, hold);
+    if (tap || button) setTimeout(() => wrap.addEventListener('click', () => { sfx('click'); finish(); }), 600);
+    else sleep(hold).then(finish);
   });
 }
 
+/** Portrait with name. Immune castaways wear the necklace and glow gold. */
 export function avatarChip(p, { size = 56, expr, label = true, cls = '', sub } = {}) {
-  return h('div', { class: `chip ${cls} ${p.alive === false ? 'is-out' : ''}`, 'data-id': p.id },
-    h('div', { class: 'chip-face', html: avatarSVG(p.look, { size, expr: expr || (p.alive === false ? 'sad' : 'neutral') }) }),
-    p.immune ? h('div', { class: 'chip-necklace', title: 'Immune' }, '📿') : null,
+  return h('div', { class: `chip ${cls} ${p.alive === false ? 'is-out' : ''} ${p.immune ? 'is-immune' : ''}`, 'data-id': p.id },
+    h('div', { class: 'chip-face', style: { width: `${size}px`, height: `${size}px` }, html: avatarSVG(p.look, { size, expr: expr || (p.alive === false ? 'sad' : 'neutral'), necklace: !!p.immune }) }),
+    p.immune ? h('div', { class: 'chip-tag' }, 'IMMUNE') : null,
     label ? h('div', { class: 'chip-name' }, p.human ? `${p.name} (you)` : p.name) : null,
     sub ? h('div', { class: 'chip-sub' }, sub) : null,
   );
 }
 
-/** Countdown that ticks in the last 10 seconds. */
+/** Countdown that ticks in the last 10 seconds and freezes while paused. */
 export class Timer {
-  constructor(seconds, { onTick, onEnd } = {}) {
+  constructor(seconds, { onTick, onEnd, tick = true } = {}) {
     this.total = seconds;
     this.left = seconds;
     this.onTick = onTick;
     this.onEnd = onEnd;
+    this.tickSound = tick;
     this._iv = null;
     this._lastWhole = Math.ceil(seconds);
   }
@@ -71,12 +72,12 @@ export class Timer {
     let last = performance.now();
     this._iv = setInterval(() => {
       const now = performance.now();
-      this.left -= (now - last) / 1000;
+      if (!clock.paused) this.left -= (now - last) / 1000;
       last = now;
       const whole = Math.ceil(this.left);
       if (whole !== this._lastWhole) {
         this._lastWhole = whole;
-        if (whole <= 10 && whole > 0) sfx('tick');
+        if (this.tickSound && whole <= 10 && whole > 0) sfx('tick');
       }
       this.onTick?.(this.left, this);
       if (this.left <= 0) this.end();
@@ -111,17 +112,20 @@ export function timerRing(cls = '') {
   return el;
 }
 
-export async function typeText(el, text, speed = 22) {
-  el.textContent = '';
-  for (const ch of text) {
-    el.textContent += ch;
-    await sleep(speed);
-  }
+/** Waits `ms` (pausable) or until the player taps `el`, whichever comes first. */
+export function tapOrWait(el, ms) {
+  return new Promise((resolve) => {
+    let done = false;
+    const fin = () => { if (done) return; done = true; el.removeEventListener('click', fin); el.classList.remove('tappable'); resolve(); };
+    el.classList.add('tappable');
+    setTimeout(() => el.addEventListener('click', fin), 350);
+    sleep(ms).then(fin);
+  });
 }
 
 export function modal(contentEl, { dismissable = true } = {}) {
   return new Promise((resolve) => {
-    const wrap = h('div', { class: 'modal-wrap' }, h('div', { class: 'modal card' }, contentEl));
+    const wrap = h('div', { class: 'modal-wrap' }, h('div', { class: 'modal panel' }, contentEl));
     const close = (v) => { wrap.classList.add('out'); setTimeout(() => wrap.remove(), 250); resolve(v); };
     if (dismissable) wrap.addEventListener('click', (e) => { if (e.target === wrap) close(null); });
     contentEl.close = close;
@@ -132,4 +136,42 @@ export function modal(contentEl, { dismissable = true } = {}) {
 export function setMusic(m, amb) {
   audio.music(m);
   if (amb !== undefined) audio.ambient(amb);
+}
+
+// ---------- pause menu ----------
+export function setPausable(on) {
+  document.body.classList.toggle('pausable', on);
+}
+
+export function openPause({ onHowTo } = {}) {
+  if (clock.paused) return;
+  clock.paused = true;
+  audio.ctx?.suspend();
+  sfx('click');
+  const soundBtn = h('button', { class: 'btn btn-ghost' }, audio.muted ? '🔇 Sound: Off' : '🔊 Sound: On');
+  const close = () => {
+    wrap.classList.add('out');
+    setTimeout(() => wrap.remove(), 250);
+    clock.paused = false;
+    audio.ctx?.resume();
+  };
+  soundBtn.addEventListener('click', () => {
+    audio.setMuted(!audio.muted);
+    soundBtn.textContent = audio.muted ? '🔇 Sound: Off' : '🔊 Sound: On';
+  });
+  const quit = h('button', { class: 'btn btn-ghost danger' }, 'Quit to main menu');
+  quit.addEventListener('click', () => {
+    if (quit.dataset.armed) { location.reload(); return; }
+    quit.dataset.armed = '1';
+    quit.textContent = 'Tap again to quit (progress is lost)';
+  });
+  const wrap = h('div', { class: 'modal-wrap pause' },
+    h('div', { class: 'modal panel pause-menu' },
+      h('div', { class: 'display sm' }, 'Paused'),
+      h('div', { class: 'stack' },
+        h('button', { class: 'btn', onclick: close }, '▶ Resume'),
+        soundBtn,
+        onHowTo ? h('button', { class: 'btn btn-ghost', onclick: () => onHowTo() }, 'How to play') : null,
+        quit)));
+  $('#overlay').append(wrap);
 }

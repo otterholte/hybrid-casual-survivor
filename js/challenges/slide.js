@@ -107,7 +107,7 @@ export default {
         g.drawImage(pic, 150, 55, 100, 100);
         g.restore();
         g.strokeStyle = '#7a4b22'; g.lineWidth = 4; rr(g, 150, 60, 100, 90, 10); g.stroke();
-        g.fillStyle = '#fff'; g.font = '14px "Luckiest Guy", sans-serif'; g.textAlign = 'center';
+        g.fillStyle = '#fff'; g.font = '18px "Bebas Neue", sans-serif'; g.textAlign = 'center';
         g.fillText('MAKE THIS', 200, 52);
         for (const v of board) {
           if (v === N * N - 1 && !solved) continue;
@@ -126,7 +126,7 @@ export default {
           if (diff !== 'hard' && !solved) {
             g.fillStyle = 'rgba(42,20,8,.75)';
             g.beginPath(); g.arc(x + 18, y + 18, 12, 0, Math.PI * 2); g.fill();
-            g.fillStyle = '#fff'; g.font = '15px "Luckiest Guy", sans-serif'; g.textAlign = 'center';
+            g.fillStyle = '#fff'; g.font = '19px "Bebas Neue", sans-serif'; g.textAlign = 'center';
             g.fillText(String(v + 1), x + 18, y + 24);
           }
         }
@@ -136,7 +136,7 @@ export default {
           rr(g, X0 - 6, Y0 - 6, B + 12, B + 12, 12); g.stroke();
         }
         if (t < 4) {
-          g.fillStyle = '#fff'; g.font = '18px "Luckiest Guy", sans-serif'; g.textAlign = 'center';
+          g.fillStyle = '#fff'; g.font = '22px "Bebas Neue", sans-serif'; g.textAlign = 'center';
           g.fillText('TAP A TILE NEXT TO THE GAP', 200, 548 - Math.abs(Math.sin(t * 3)) * 5);
         }
       },

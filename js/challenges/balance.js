@@ -123,10 +123,10 @@ export default {
           g.strokeStyle = 'rgba(255,255,255,.6)'; g.lineWidth = 3;
           g.beginPath(); g.arc(aim.x, aim.y, 22, 0, Math.PI * 2); g.stroke();
         }
-        g.fillStyle = '#fff'; g.font = '20px "Luckiest Guy", sans-serif'; g.textAlign = 'center';
+        g.fillStyle = '#fff'; g.font = '24px "Bebas Neue", sans-serif'; g.textAlign = 'center';
         g.fillText(`BALLS: ${balls.length}   NEXT IN ${Math.max(0, Math.ceil(nextBall))}`, 200, 34);
         if (t < 4) {
-          g.font = '17px "Luckiest Guy", sans-serif';
+          g.font = '21px "Bebas Neue", sans-serif';
           g.fillText('HOLD & DRAG TO TILT', 200, 560 - Math.abs(Math.sin(t * 3)) * 5);
         }
       },

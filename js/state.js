@@ -1,6 +1,7 @@
 // Season state: players, relationships, idols, and vote history.
 import { ARCHETYPES, CAST_POOL } from './data.js';
 import { shuffle, rand, clamp } from './util.js';
+import { randomLook } from './avatar.js';
 
 export const game = { S: null };
 
@@ -16,7 +17,7 @@ export function newSeason(settings) {
       const base = ARCHETYPES[b.arch].t;
       const t = {};
       for (const k in base) t[k] = clamp(base[k] + rand(-0.12, 0.12), 0.05, 0.98);
-      return { id: i + 1, human: false, name: b.name, job: b.job, arch: b.arch, look: b.look, t };
+      return { id: i + 1, human: false, name: b.name, job: b.job, arch: b.arch, look: { ...randomLook(b.look.gender), facial: 0, ...b.look }, t };
     }),
   ];
   for (const p of players) {
@@ -60,6 +61,10 @@ export const nm = (id) => game.S.players[id].name;
 export const alive = () => game.S.players.filter((p) => p.alive);
 export const aliveBots = () => game.S.players.filter((p) => p.alive && !p.human);
 export const human = () => game.S.players[0];
+export const pron = (id, kind = 'self') => {
+  const f = game.S.players[id].look.gender === 'f';
+  return { self: f ? 'herself' : 'himself', obj: f ? 'her' : 'him', subj: f ? 'she' : 'he', pos: f ? 'her' : 'his' }[kind];
+};
 
 export function adjTrust(a, b, d) {
   const S = game.S;
