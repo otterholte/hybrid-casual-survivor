@@ -179,6 +179,14 @@ class AudioEngine {
         this.tone({ freq: 2489, dur: 1.2, vol: 0.02, attack: 0.01 });
         this.tone({ freq: 110, type: 'triangle', dur: 2.2, vol: 0.12, attack: 0.02, filter: 500 });
         break;
+      case 'scribble':
+        // Pencil on paper: a run of short, scratchy strokes.
+        for (let i = 0, t = 0; i < 11; i++) {
+          const d = rand(0.05, 0.13);
+          this.noise({ dur: d, vol: rand(0.05, 0.11), type: 'bandpass', freq: rand(2600, 4800), slideTo: rand(1800, 5200), q: 3, attack: 0.01, delay: t });
+          t += d + rand(0.01, 0.05);
+        }
+        break;
       case 'cast': this.tone({ freq: 90, slideTo: 45, dur: 1.1, vol: 0.55 }); this.noise({ dur: 0.9, vol: 0.12, freq: 600, slideTo: 120, attack: 0.15 }); break;
       case 'void': this.tone({ freq: 140, slideTo: 70, type: 'sawtooth', dur: 0.5, vol: 0.12, filter: 600 }); this.tone({ freq: 70, slideTo: 40, dur: 0.6, vol: 0.5 }); break;
       case 'question': this.tone({ freq: 74, slideTo: 60, dur: 0.9, vol: 0.35 }); this.tone({ freq: 880, dur: 0.8, vol: 0.025, attack: 0.05 }); break;

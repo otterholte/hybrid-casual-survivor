@@ -2,7 +2,7 @@
 import { h, $, pick, shuffle, store } from './util.js';
 import { audio, sfx } from './audio.js';
 import { show, banner, setScene, setMusic, avatarChip, modal, setPausable, openPause } from './ui.js';
-import { avatarSVG, randomLook, SKINS, HAIRS, HAIR_STYLES, HAIR_LABELS, BUFFS, FACES, EYES, EYE_COLORS, BROWS, NOSES, MOUTHS, FACIAL } from './avatar.js';
+import { avatarSVG, randomLook, SKINS, HAIRS, HAIR_STYLES, HAIR_LABELS, SHIRTS, SHIRT_NAMES, FACES, FACE_NAMES, EYES, EYE_COLORS, NOSES, MOUTHS, FACIAL } from './avatar.js';
 import { ARCHETYPES, PLAYER_JOBS } from './data.js';
 import { game, newSeason, alive, human, P, nm } from './state.js';
 import { beginRoundAI, computePlans } from './ai.js';
@@ -10,6 +10,7 @@ import { CHALLENGES, byId, runChallenge, simulateChallenge } from './challenges/
 import { runCamp, simulateCamp, hideIdolIfNeeded } from './camp.js';
 import { runTribal, simulateTribal } from './tribal.js';
 import { finalTribal } from './finale.js';
+import { llm, loadLLM, llmEnabled, setLlmEnabled, MODEL_SIZE } from './llm.js';
 
 const DEFAULTS = { name: '', castSize: 8, difficulty: 'normal', campTimer: 0, look: randomLook('m') };
 let settings = { ...DEFAULTS, ...store.get('ic_settings2', {}) };
@@ -70,33 +71,38 @@ function setupScreen() {
   const L = settings.look;
   const preview = h('div', { class: 'setup-face' });
   const paint = () => preview.replaceChildren(h('div', { class: 'chip-face', style: { width: '150px', height: '150px' }, html: avatarSVG(L, { size: 150 }) }));
-  const cyclers = h('div', { class: 'cyclers' });
-  const fields = [
+  const cap = (x) => x[0].toUpperCase() + x.slice(1);
+  const basic = [
     ['Skin', 'skin', SKINS.length, (i) => `Tone ${i + 1}`],
-    ['Face shape', 'face', FACES.length, (i) => FACES[i]],
-    ['Eyes', 'eyes', EYES.length, (i) => EYES[i]],
-    ['Eye color', 'eyeColor', EYE_COLORS.length, (i) => ['Brown', 'Hazel', 'Blue', 'Green', 'Gray'][i]],
-    ['Brows', 'brows', BROWS.length, (i) => BROWS[i]],
-    ['Nose', 'nose', NOSES.length, (i) => NOSES[i]],
-    ['Mouth', 'mouth', MOUTHS.length, (i) => MOUTHS[i]],
     ['Hair style', 'style', HAIR_STYLES.length, (i) => HAIR_LABELS[i]],
     ['Hair color', 'hair', HAIRS.length, (i) => `Shade ${i + 1}`],
-    ['Facial hair', 'facial', FACIAL.length, (i) => FACIAL[i]],
-    ['Buff color', 'buff', BUFFS.length, (i) => `Color ${i + 1}`],
+    ['Shirt', 'shirt', SHIRTS.length, (i) => SHIRT_NAMES[i]],
   ];
-  const paintCyclers = () => cyclers.replaceChildren(...fields.map(([label, key, n, name]) => {
-    const val = h('small', {}, name(((L[key] ?? 0) % n + n) % n));
+  const more = [
+    ['Face shape', 'face', FACES.length, (i) => FACE_NAMES[i]],
+    ['Eyes', 'eyes', EYES.length, (i) => cap(EYES[i])],
+    ['Eye color', 'eyeColor', EYE_COLORS.length, (i) => ['Brown', 'Hazel', 'Blue', 'Green', 'Gray'][i]],
+    ['Nose', 'nose', NOSES.length, (i) => cap(NOSES[i])],
+    ['Mouth', 'mouth', MOUTHS.length, (i) => cap(MOUTHS[i])],
+    ['Facial hair', 'facial', FACIAL.length, (i) => cap(FACIAL[i])],
+  ];
+  const basicBox = h('div', { class: 'cyclers' });
+  const moreBox = h('div', { class: 'cyclers hidden' });
+  const moreBtn = h('button', { class: 'btn btn-ghost sm', onclick: () => { sfx('click'); moreBox.classList.toggle('hidden'); moreBtn.textContent = moreBox.classList.contains('hidden') ? 'More options ▾' : 'Fewer options ▴'; } }, 'More options ▾');
+  const makeCyclers = (fields) => fields.map(([label, key, n, name]) => {
+    const val = h('small', {}, name((((L[key] ?? 0) % n) + n) % n));
     const step = (d) => { L[key] = (((L[key] ?? 0) + d) % n + n) % n; sfx('click'); paint(); val.textContent = name(L[key]); };
     return h('div', { class: 'cycler' },
       h('button', { class: 'cyc', onclick: () => step(-1) }, '‹'),
       h('span', {}, label, val),
       h('button', { class: 'cyc', onclick: () => step(1) }, '›'));
-  }));
+  });
+  const paintCyclers = () => { basicBox.replaceChildren(...makeCyclers(basic)); moreBox.replaceChildren(...makeCyclers(more)); };
   const genderSeg = h('div', { class: 'seg' });
   const paintGender = () => genderSeg.replaceChildren(...[['m', 'Man'], ['f', 'Woman']].map(([g, lab]) => h('button', {
     class: L.gender === g ? 'on' : '', onclick: () => {
       if (L.gender === g) return;
-      Object.assign(L, randomLook(g), { skin: L.skin, eyeColor: L.eyeColor, buff: L.buff });
+      Object.assign(L, randomLook(g), { skin: L.skin, eyeColor: L.eyeColor, shirt: L.shirt });
       sfx('click'); paint(); paintGender(); paintCyclers();
     },
   }, lab)));
@@ -107,6 +113,21 @@ function setupScreen() {
     render();
     return wrap;
   };
+  const aiSeg = h('div', { class: 'seg' });
+  const aiNote = h('div', { class: 'muted', style: { fontSize: '12px' } });
+  const paintAi = () => {
+    const on = llmEnabled();
+    aiSeg.replaceChildren(
+      h('button', { class: on ? '' : 'on', onclick: () => { setLlmEnabled(false); sfx('click'); paintAi(); } }, 'Classic'),
+      h('button', { class: on ? 'on' : '', onclick: () => { setLlmEnabled(true); sfx('click'); loadLLM(); paintAi(); } }, 'On-device AI'));
+    aiNote.textContent = !on ? 'Castaways answer from the game’s rules engine.'
+      : llm.status === 'ready' ? `AI ready (${llm.device === 'webgpu' ? 'GPU' : 'CPU'}). Small talk is written live on your device; strategy replies still follow the rules engine.`
+      : llm.status === 'loading' ? `Downloading the AI model once (${MODEL_SIZE})... ${Math.round(llm.progress * 100)}%`
+      : llm.status === 'error' ? 'The AI model couldn’t load on this device. Classic chat will be used.'
+      : `Runs fully on your device after a one-time ${MODEL_SIZE} download. No internet needed afterwards.`;
+  };
+  llm.listeners.add(() => { if (aiNote.isConnected) paintAi(); });
+  paintAi();
   const nameIn = h('input', { class: 'name-in', placeholder: 'Your castaway name', maxlength: 12, value: settings.name || '' });
   show(h('div', { class: 'screen setup' },
     h('div', { class: 'eyebrow' }, 'NEW SEASON'),
@@ -114,13 +135,16 @@ function setupScreen() {
     h('div', { class: 'panel setup-card' },
       preview,
       genderSeg,
-      nameIn,
-      cyclers,
-      h('button', { class: 'btn btn-ghost sm', onclick: () => { Object.assign(L, randomLook(L.gender)); sfx('click'); paint(); paintCyclers(); } }, '🎲 Randomize look')),
+      h('button', { class: 'btn btn-dark', onclick: () => { Object.assign(L, randomLook(L.gender)); sfx('click'); paint(); paintCyclers(); } }, '🎲 Randomize look'),
+      basicBox,
+      moreBtn,
+      moreBox,
+      nameIn),
     h('div', { class: 'panel setup-card' },
       h('div', { class: 'opt-lab' }, 'Castaways'), seg('castSize', [[6, '6 · ~20 min'], [8, '8 · ~30 min'], [10, '10 · ~40 min']]),
       h('div', { class: 'opt-lab' }, 'Challenge difficulty'), seg('difficulty', [['easy', 'Easy'], ['normal', 'Normal'], ['hard', 'Hard']]),
-      h('div', { class: 'opt-lab' }, 'Camp time limit'), seg('campTimer', [[0, 'None'], [120, '2 min'], [180, '3 min']])),
+      h('div', { class: 'opt-lab' }, 'Camp time limit'), seg('campTimer', [[0, 'None'], [120, '2 min'], [180, '3 min']]),
+      h('div', { class: 'opt-lab' }, 'Castaway chat'), aiSeg, aiNote),
     h('div', { class: 'row' },
       h('button', { class: 'btn btn-ghost', onclick: () => { sfx('click'); saveSettings(); titleScreen(); } }, 'Back'),
       h('button', { class: 'btn btn-big grow', onclick: () => {
@@ -171,6 +195,7 @@ function nextChallenge(final) {
 
 async function playSeason() {
   const S = newSeason({ ...settings, look: { ...settings.look }, job: pick(PLAYER_JOBS) });
+  if (llmEnabled()) loadLLM();
   setPausable(true);
   challengeBag = [];
   await castReveal();

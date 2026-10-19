@@ -38,7 +38,7 @@ export async function finalTribal() {
   const card = (who, text, label) => {
     const face = who == null ? avatarSVG(HOST.look, { size: 46 }) : avatarSVG(P(who).look, { size: 46 });
     stage.replaceChildren(h('div', { class: 'host-card' }, h('div', { class: 'host-face', html: face }),
-      h('div', { class: 'host-q' }, h('div', { class: 'who' }, label || (who == null ? HOST.name.toUpperCase() : `JUROR ${P(who).name.toUpperCase()}`)), h('div', { class: 'q' }, text))));
+      h('div', { class: 'host-q' }, h('div', { class: 'who' }, label || (who == null ? `${HOST.name.toUpperCase()} · YOUR HOST` : `JUROR ${P(who).name.toUpperCase()}`)), h('div', { class: 'q' }, text))));
   };
   const answer = (id, text) => {
     const p = P(id);
@@ -187,7 +187,7 @@ export async function finalTribal() {
 function humanJuryVote(finalists, controls) {
   return new Promise((resolve) => {
     controls.replaceChildren(h('div', { class: 'choices' }, h('div', { class: 'ch-q' }, 'YOU ARE ON THE JURY. WHO SHOULD WIN?'),
-      h('div', { class: 'vote-grid' }, ...finalists.map((f) => h('button', { class: 'vote-card', onclick: () => { sfx('cast'); resolve(f); } }, avatarChip(P(f), { size: 64 }))))));
+      h('div', { class: 'vote-grid' }, ...finalists.map((f) => h('button', { class: 'vote-card', onclick: () => { sfx('scribble'); resolve(f); } }, avatarChip(P(f), { size: 64 }))))));
   });
 }
 

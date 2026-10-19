@@ -6,7 +6,7 @@ import { show, banner, setScene, setMusic, Timer, timerRing, avatarChip, modal, 
 import { avatarSVG } from './avatar.js';
 import { sfx } from './audio.js';
 
-export const HOST = { name: 'Kai', look: { gender: 'm', skin: 4, hair: 0, style: 1, face: 2, eyes: 3, eyeColor: 0, brows: 3, nose: 0, mouth: 3, facial: 1, buff: 6 } };
+export const HOST = { name: 'Kai', look: { gender: 'm', skin: 4, hair: 0, style: 1, face: 2, eyes: 3, eyeColor: 0, nose: 0, mouth: 0, facial: 1, shirt: 6 } };
 const hostFace = (size = 50) => avatarSVG(HOST.look, { size });
 const readMs = (text) => 2200 + text.length * 38;
 
@@ -107,7 +107,7 @@ export async function runTribal({ juror = false } = {}) {
     seats.classList.toggle('dim', id != null);
     for (const [k, el] of Object.entries(seatEls)) el.classList.toggle('spot', +k === id);
   };
-  const hostCard = (text, label = HOST.name.toUpperCase()) => {
+  const hostCard = (text, label = `${HOST.name.toUpperCase()} · YOUR HOST`) => {
     stage.replaceChildren(h('div', { class: 'host-card' },
       h('div', { class: 'host-face', html: hostFace(46) }),
       h('div', { class: 'host-q' }, h('div', { class: 'who' }, label), h('div', { class: 'q' }, text))));
@@ -127,7 +127,7 @@ export async function runTribal({ juror = false } = {}) {
   const imm = alive().find((p) => p.immune);
   hostCard(imm
     ? `Welcome to Tribal Council. ${imm.human ? 'You have' : `${imm.name} has`} individual immunity tonight. ${imm.human ? 'You' : pron(imm.id, 'subj').replace(/^./, (c) => c.toUpperCase())} cannot be voted out. Everyone else is vulnerable.`
-    : 'Welcome to Tribal Council. Nobody is safe tonight.');
+    : 'Welcome to Tribal Council. Nobody is safe tonight.', `${HOST.name.toUpperCase()} · YOUR HOST`);
   if (imm) spotlight(imm.id);
   sfx('question');
   await beat(4200);
@@ -296,8 +296,8 @@ export async function runTribal({ juror = false } = {}) {
         castDone = true;
         t.stop();
         box.replaceChildren(h('div', { class: 'parchment-write' }, h('div', { class: 'scrawl' }, P(id).name)), h('div', { class: 'muted center' }, 'You fold the parchment and drop it in the urn.'));
-        sfx('cast');
-        await sleep(2400);
+        sfx('scribble');
+        await sleep(2600);
         wrap.classList.add('out');
         setTimeout(() => wrap.remove(), 250);
         resolve(id);
@@ -369,7 +369,6 @@ export async function runTribal({ juror = false } = {}) {
       tallyEl.append(col);
       return cols[id];
     };
-    const validLeft = (fromIdx) => seq.slice(fromIdx).filter((t) => !prot2.has(t));
     const ordinals = ['First vote', 'Second vote', 'Third vote', 'Fourth vote', 'Fifth vote', 'Sixth vote', 'Seventh vote', 'Eighth vote', 'Ninth vote'];
 
     for (let i = 0; i < seq.length; i++) {
@@ -404,10 +403,11 @@ export async function runTribal({ juror = false } = {}) {
         for (const [id, cc] of Object.entries(cols)) cc.col.classList.toggle('leader', (shown[id] || 0) === maxN && maxN > 0);
       }
       if (out != null) {
-        const rest = validLeft(i + 1);
+        // Only call it once nobody could catch up, whatever the unread votes say.
+        const unread = seq.length - (i + 1);
         const leader = shown[out] || 0;
         const bestRival = Math.max(0, ...Object.entries(shown).filter(([id]) => +id !== out).map(([, n]) => n));
-        if (rest.length && leader > bestRival + rest.filter((x) => x !== out).length) {
+        if (unread > 0 && leader > bestRival + unread) {
           await sleep(2200);
           hostMini.textContent = `That’s ${leader}. That’s enough.`;
           sfx('boom');

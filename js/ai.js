@@ -24,7 +24,7 @@ export function beginRoundAI() {
   computePlans();
 }
 
-function rawScore(b, c) {
+export function rawScore(b, c) {
   const s = S(), bt = P(b).t;
   return -s.trust[b][c] * 1.3
     + s.threat[c] * (0.4 + bt.strategic * 0.8)
@@ -81,7 +81,7 @@ const say = (arr) => pick(arr);
 const T = (id) => (id === H ? 'you' : nm(id));
 
 // A bot's reply is { text, options? }. Options are quick replies; each fx returns another reply (or a string).
-function backingVote(botId, X) {
+export function backingVote(botId, X) {
   const s = S();
   s.promises[botId] = X;
   adjTrust(botId, H, 0.08);
@@ -453,24 +453,29 @@ export function humanChoices(type) {
       { label: 'I feel good. I trust my people.', fx: lead('loyal') },
       { label: 'Nobody is safe tonight.', fx: lead('idolwarn') },
       { label: 'Honestly? I’m nervous.', fx: lead('plead') },
+      { label: 'Hard to say. It’s a weird night.', fx: () => null },
     ];
     case 'threat': return [
       { label: '{X}. It’s obvious.', pick: true, fx: lead('threat') },
       { label: 'Everyone is a threat now.', fx: () => null },
+      { label: 'I’m honestly not sure yet. Still figuring people out.', fx: () => null },
     ];
     case 'trust': return [
       { label: '{X}. I don’t buy a word they say.', pick: true, fx: lead('liar') },
       { label: 'I trust everyone here.', fx: lead('loyal') },
+      { label: 'I’m not totally sure. Everyone’s playing their own game.', fx: () => null },
     ];
     case 'idol': return [
       { label: 'Somebody definitely has one.', fx: lead('idolwarn') },
       { label: 'Not really.', fx: () => null },
+      { label: 'Who knows. Anything can happen out here.', fx: () => null },
       { label: 'If I had one, I wouldn’t tell you.', fx: () => { s.idolSusp[H] = clamp(s.idolSusp[H] + 0.2, 0, 1); for (const b of aliveBots()) s.influence[b.id][H] -= 0.12; computePlans(); return { who: pick(aliveBots()).id, text: '...Noted.' }; } },
     ];
     case 'decide': return [
       { label: 'Loyalty. I’m sticking with my people.', fx: lead('loyal') },
       { label: 'Keeping it simple tonight: {X}.', pick: true, fx: lead('simple') },
       { label: 'Taking out whoever I can’t beat at the end.', fx: () => { s.threat[H] += 0.04; computePlans(); return null; } },
+      { label: 'I’ll go with my gut when I get up there.', fx: () => null },
     ];
   }
   return [{ label: 'I’ll let my vote speak for me.', fx: () => null }];

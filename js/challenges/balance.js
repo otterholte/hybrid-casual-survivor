@@ -1,8 +1,10 @@
-// Ball Balance: tilt a rope-held disc to keep every ball aboard. A new ball drops in regularly.
+// Ball Balance: tilt a rope-held disc with the control pad below it to keep every ball aboard.
+// A new ball drops in regularly. When one rolls off you watch it go over the edge, then you're out.
 import { jungle, ball, shadow } from './draw.js';
 import { rand } from '../util.js';
 
-const C = { x: 200, y: 340 }, R = 150, BR = 13;
+const C = { x: 200, y: 250 }, R = 140, BR = 13;
+const PAD = { x: 200, y: 552, r: 78 };
 const COLORS = ['#ffffff', '#f6c90e', '#ef476f', '#1fb5c9', '#7bc043', '#9b5de5'];
 
 export default {
@@ -12,29 +14,41 @@ export default {
   skill: 'endurance',
   edge: ['#1e6b45', '#0f3d29'],
   mode: 'endurance',
-  how: 'Hold and drag to <b>tilt the disc</b>: balls roll toward your finger. Wind and wobble push them around, and a new ball lands every few seconds. <b>Lose one and you\'re out!</b>',
+  how: 'Use the <b>control pad</b> under the disc to tilt it: push the knob the way you want the balls to roll. Wind and wobble push them around, and a new ball lands every few seconds. <b>Lose one and you\'re out!</b>',
   goal: () => 0,
   expected: (d) => ({ easy: 70, normal: 55, hard: 45 })[d],
   unit: 'balls',
   create(api) {
     const { W, H, diff } = api;
     const [every, wind0, windGrow] = { easy: [17, 22, 0.6], normal: [14, 32, 0.9], hard: [11, 42, 1.2] }[diff];
-    let tilt = { x: 0, y: 0 }, aim = null, out = false, nextBall = every, warn = null;
+    let tilt = { x: 0, y: 0 }, stick = null, out = false, nextBall = every, warn = null, faller = null;
     const balls = [{ x: rand(-20, 20), y: rand(-20, 20), vx: 0, vy: 0, c: COLORS[0], drop: 1, ph: rand(0, 6) }];
     const addBall = () => {
       const a = rand(0, Math.PI * 2), d = rand(0, R * 0.4);
       warn = { x: Math.cos(a) * d, y: Math.sin(a) * d, t: 1.1 };
     };
+    const setStick = (x, y) => {
+      let dx = (x - PAD.x) / PAD.r, dy = (y - PAD.y) / PAD.r;
+      const l = Math.hypot(dx, dy);
+      if (l > 1) { dx /= l; dy /= l; }
+      stick = { x: dx, y: dy };
+    };
 
     return {
       update(dt, t) {
-        if (out) {
-          for (const b of balls) if (b.falling) { b.fall += dt * 2; }
+        if (faller) {
+          // The ball keeps rolling outward and drops off the rim.
+          faller.t += dt;
+          faller.b.x += faller.b.vx * dt;
+          faller.b.y += faller.b.vy * dt;
+          faller.b.fall = Math.min(1, faller.t / 0.9);
+          if (faller.t >= 1.0 && !out) {
+            out = true;
+            api.fail('A ball rolled off!');
+          }
           return;
         }
-        const target = aim ? { x: (aim.x - C.x) / R, y: (aim.y - C.y) / R } : { x: 0, y: 0 };
-        const tl = Math.hypot(target.x, target.y);
-        if (tl > 1) { target.x /= tl; target.y /= tl; }
+        const target = stick || { x: 0, y: 0 };
         tilt.x += (target.x - tilt.x) * Math.min(1, dt * 7);
         tilt.y += (target.y - tilt.y) * Math.min(1, dt * 7);
         const amp = wind0 + windGrow * t;
@@ -50,7 +64,6 @@ export default {
           b.x += b.vx * dt;
           b.y += b.vy * dt;
         }
-        // Ball-ball collisions.
         for (let i = 0; i < balls.length; i++) for (let j = i + 1; j < balls.length; j++) {
           const a = balls[i], b = balls[j];
           if (a.drop || b.drop) continue;
@@ -63,13 +76,14 @@ export default {
           }
         }
         for (const b of balls) {
-          if (Math.hypot(b.x, b.y) > R - BR * 0.3 && !b.drop) {
-            out = true;
-            b.falling = true;
-            b.fall = 0;
+          const d = Math.hypot(b.x, b.y);
+          if (d > R - BR * 0.3 && !b.drop) {
+            // Make sure it visibly heads outward even if it was barely creeping.
+            const ux = b.x / d, uy = b.y / d, sp = Math.max(70, b.vx * ux + b.vy * uy);
+            b.vx = ux * sp; b.vy = uy * sp;
+            faller = { b, t: 0 };
             api.sfx('thud');
-            api.fx.shake(10);
-            api.fail('A ball rolled off!');
+            api.fx.shake(8);
             return;
           }
         }
@@ -88,10 +102,11 @@ export default {
       },
       draw(g, t) {
         jungle(g, W, H, t);
+        g.fillStyle = 'rgba(0,0,0,.25)';
+        g.fillRect(0, 0, W, H);
         const ox = -tilt.x * 6, oy = -tilt.y * 6;
-        // Ropes out to the corners.
         g.strokeStyle = '#d9b37a'; g.lineWidth = 4;
-        for (const [ex, ey, ax, ay] of [[0, 0, -0.7, -0.7], [W, 0, 0.7, -0.7], [0, H, -0.7, 0.7], [W, H, 0.7, 0.7]]) {
+        for (const [ex, ey, ax, ay] of [[0, 0, -0.7, -0.7], [W, 0, 0.7, -0.7], [0, 440, -0.7, 0.7], [W, 440, 0.7, 0.7]]) {
           g.beginPath(); g.moveTo(C.x + ox + ax * R, C.y + oy + ay * R); g.lineTo(ex, ey); g.stroke();
         }
         shadow(g, C.x + 10, C.y + 22, R, R * 0.9, 0.35);
@@ -110,29 +125,44 @@ export default {
         }
         for (const b of balls) {
           const bx = C.x + ox + b.x, by = C.y + oy + b.y;
-          if (b.falling) {
-            const s = Math.max(0.1, 1 - b.fall);
-            ball(g, bx + b.vx * b.fall * 0.3, by + b.vy * b.fall * 0.3 + b.fall * 60, BR * s, b.c);
+          if (b.fall) {
+            // Over the rim: shrink and drop below the disc.
+            const f = b.fall;
+            ball(g, bx, by + f * f * 90, BR * (1 - f * 0.55), b.c);
             continue;
           }
           const lift = b.drop * 120;
           shadow(g, bx + 3 + tilt.x * 4, by + 4 + tilt.y * 4, BR * (1 - b.drop * 0.5), BR * 0.6, 0.35);
           ball(g, bx, by - lift, BR * (1 + b.drop * 0.6), b.c);
         }
-        if (aim) {
-          g.strokeStyle = 'rgba(255,255,255,.6)'; g.lineWidth = 3;
-          g.beginPath(); g.arc(aim.x, aim.y, 22, 0, Math.PI * 2); g.stroke();
+        // Control pad.
+        g.fillStyle = 'rgba(0,0,0,.35)';
+        g.beginPath(); g.arc(PAD.x, PAD.y, PAD.r + 10, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = 'rgba(255,255,255,.25)'; g.lineWidth = 2;
+        g.beginPath(); g.arc(PAD.x, PAD.y, PAD.r, 0, Math.PI * 2); g.stroke();
+        g.fillStyle = 'rgba(255,255,255,.35)';
+        for (let k = 0; k < 4; k++) {
+          const a = (k * Math.PI) / 2;
+          g.save(); g.translate(PAD.x + Math.cos(a) * (PAD.r - 14), PAD.y + Math.sin(a) * (PAD.r - 14)); g.rotate(a);
+          g.beginPath(); g.moveTo(6, 0); g.lineTo(-4, -6); g.lineTo(-4, 6); g.fill(); g.restore();
         }
+        const kx = PAD.x + tilt.x * PAD.r * 0.8, ky = PAD.y + tilt.y * PAD.r * 0.8;
+        const kg = g.createRadialGradient(kx - 8, ky - 8, 4, kx, ky, 30);
+        kg.addColorStop(0, '#ffb36b'); kg.addColorStop(1, '#c4520f');
+        g.fillStyle = kg;
+        g.beginPath(); g.arc(kx, ky, 28, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = 'rgba(255,255,255,.4)'; g.lineWidth = 2; g.stroke();
         g.fillStyle = '#fff'; g.font = '24px "Bebas Neue", sans-serif'; g.textAlign = 'center';
         g.fillText(`BALLS: ${balls.length}   NEXT IN ${Math.max(0, Math.ceil(nextBall))}`, 200, 34);
         if (t < 4) {
-          g.font = '21px "Bebas Neue", sans-serif';
-          g.fillText('HOLD & DRAG TO TILT', 200, 560 - Math.abs(Math.sin(t * 3)) * 5);
+          g.font = '20px "Bebas Neue", sans-serif';
+          g.fillText('DRAG THE KNOB TO TILT', 200, 448 - Math.abs(Math.sin(t * 3)) * 5);
         }
       },
-      down(x, y) { aim = { x, y }; },
-      move(x, y) { if (aim) aim = { x, y }; },
-      up() { aim = null; },
+      // Anywhere below the disc steers, so your thumb never covers the balls.
+      down(x, y) { if (y > C.y + R - 10) setStick(x, y); },
+      move(x, y) { if (stick) setStick(x, y); },
+      up() { stick = null; },
     };
   },
 };

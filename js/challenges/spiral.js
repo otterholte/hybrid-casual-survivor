@@ -44,7 +44,7 @@ export default {
   unit: 'catches',
   create(api) {
     const { W, H, diff } = api;
-    const [speed0, accel, every, startBalls] = { easy: [120, 2.2, 12, 2], normal: [150, 2.8, 10, 2], hard: [175, 3.4, 8, 3] }[diff];
+    const [speed0, accel, every, startBalls] = { easy: [115, 2.0, 12, 2], normal: [135, 2.7, 10, 2], hard: [140, 3.6, 9, 2] }[diff];
     const paths = LANES.map(lanePath);
     const at = (lane, s) => {
       for (const sg of paths[lane].segs) if (s <= sg.s0 + sg.len) {

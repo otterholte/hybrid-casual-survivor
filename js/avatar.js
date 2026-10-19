@@ -3,12 +3,13 @@
 export const SKINS = ['#f6d7c3', '#eac0a0', '#d9a37c', '#b97f57', '#8d5a3b', '#5e3a26', '#3f281b'];
 export const HAIRS = ['#1b1512', '#3b2618', '#6a4024', '#a86b3c', '#d8b27a', '#b5462b', '#8a8a8a', '#e9e4dc'];
 export const EYE_COLORS = ['#4a2e1c', '#6b4a2a', '#3b6e8f', '#4f7a4a', '#6e7b85'];
-export const BUFFS = ['#e8642c', '#2a9d8f', '#c9a227', '#b23a48', '#3d5a80', '#6a4c93', '#3a3a3a'];
-export const FACES = ['oval', 'round', 'square', 'heart', 'long'];
-export const EYES = ['almond', 'round', 'narrow', 'hooded', 'wide'];
-export const BROWS = ['soft', 'straight', 'arched', 'thick', 'angled'];
-export const NOSES = ['straight', 'button', 'wide', 'pointed'];
-export const MOUTHS = ['calm', 'smile', 'smirk', 'serious', 'full'];
+export const SHIRTS = ['#e8642c', '#2a9d8f', '#c9a227', '#b23a48', '#3d5a80', '#6a4c93', '#3a3a3a', '#e9e4da', '#5b6b3a'];
+export const SHIRT_NAMES = ['Orange', 'Teal', 'Mustard', 'Red', 'Navy', 'Purple', 'Charcoal', 'White', 'Olive'];
+export const FACES = ['oval', 'round', 'square'];
+export const FACE_NAMES = ['Oval', 'Round', 'Strong jaw'];
+export const EYES = ['almond', 'round', 'narrow', 'hooded'];
+export const NOSES = ['straight', 'button', 'wide'];
+export const MOUTHS = ['calm', 'smile', 'smirk', 'full'];
 export const FACIAL = ['none', 'stubble', 'beard', 'goatee', 'mustache'];
 export const HAIR_STYLES = ['buzz', 'crop', 'sidepart', 'curly', 'afro', 'undercut', 'long', 'wavy', 'bun', 'pony', 'braids', 'pixie', 'bald'];
 export const HAIR_LABELS = ['Buzz', 'Crop', 'Side part', 'Curls', 'Afro', 'Undercut', 'Long', 'Waves', 'Bun', 'Ponytail', 'Braids', 'Pixie', 'Bald'];
@@ -25,17 +26,15 @@ const FACE_PATHS = {
   oval: 'M50 19 C64 19 70 31 70 44 C70 58 62 70 50 70 C38 70 30 58 30 44 C30 31 36 19 50 19Z',
   round: 'M50 20 C66 20 71.5 32 71.5 45 C71.5 59 62 68.5 50 68.5 C38 68.5 28.5 59 28.5 45 C28.5 32 34 20 50 20Z',
   square: 'M50 19 C64 19 70.5 29 70.5 42 L70.5 53 C70.5 62 62 69 50 70 C38 69 29.5 62 29.5 53 L29.5 42 C29.5 29 36 19 50 19Z',
-  heart: 'M50 19 C66 19 71 31 70.5 43 C70 55 59 69 50 71 C41 69 30 55 29.5 43 C29 31 34 19 50 19Z',
-  long: 'M50 17 C63 17 68.5 29 68.5 44 C68.5 60 60 72.5 50 72.5 C40 72.5 31.5 60 31.5 44 C31.5 29 37 17 50 17Z',
 };
 
-function body(look, buff) {
+function body(look, shirt) {
   const f = look.gender === 'f';
   const torso = f
     ? 'M15 100 C16 88 27 80 41 77.5 L59 77.5 C73 80 84 88 85 100Z'
     : 'M7 100 C9 86 22 78.5 39 76 L61 76 C78 78.5 91 86 93 100Z';
   const neckline = f ? 'M40 77.5 Q50 88 60 77.5Z' : 'M41 76 Q50 84 59 76Z';
-  return `<path d="${torso}" fill="${buff}"/>
+  return `<path d="${torso}" fill="${shirt}"/>
     <path d="${torso}" fill="url(#avBodyShade)"/>
     <path d="${neckline}" fill="${shade(look._skin, -0.12)}"/>`;
 }
@@ -78,7 +77,7 @@ function hairFront(style, c) {
 function eyes(look, expr) {
   const type = at(EYES, look.eyes ?? 0);
   const iris = at(EYE_COLORS, look.eyeColor ?? 0);
-  const dims = { almond: [4.6, 2.6], round: [4, 3.3], narrow: [4.7, 1.9], hooded: [4.4, 2.5], wide: [5, 3] }[type];
+  const dims = { almond: [4.6, 2.6], round: [4, 3.3], narrow: [4.7, 1.9], hooded: [4.4, 2.5] }[type];
   let [rx, ry] = dims;
   if (expr === 'happy') ry *= 0.55;
   if (expr === 'shock') ry *= 1.35;
@@ -101,17 +100,13 @@ function eyes(look, expr) {
 }
 
 function brows(look, expr) {
-  const type = at(BROWS, look.brows ?? 0);
   const c = shade(at(HAIRS, look.hair), -0.15);
-  const w = { soft: 1.6, straight: 1.8, arched: 1.5, thick: 2.8, angled: 2 }[type] + (look.gender === 'f' ? -0.3 : 0.2);
+  const w = look.gender === 'f' ? 1.5 : 2.1;
   const lift = expr === 'shock' ? -2.5 : 0;
   const L = () => {
     const y = 40 + lift;
     if (expr === 'sad') return `M35 ${y + 1} Q40 ${y - 0.5} 45.5 ${y - 1.2}`;
     if (expr === 'smug') return `M35 ${y} Q40 ${y - 2.5} 45.5 ${y - 0.5}`;
-    if (type === 'arched') return `M35 ${y + 0.5} Q39.5 ${y - 3} 45.5 ${y}`;
-    if (type === 'angled') return `M35 ${y + 0.6} L42 ${y - 1.8} L45.5 ${y - 0.6}`;
-    if (type === 'straight') return `M35 ${y} L45.5 ${y - 0.4}`;
     return `M35 ${y + 0.3} Q40 ${y - 1.5} 45.5 ${y - 0.2}`;
   };
   const left = L();
@@ -139,7 +134,6 @@ function nose(look) {
   switch (type) {
     case 'button': return `<path d="M47.5 56 Q50 58 52.5 56" stroke="${c}" stroke-width="1.3" fill="none" stroke-linecap="round"/><circle cx="50" cy="54.5" r="2" fill="${c}" opacity=".18"/>`;
     case 'wide': return `<path d="M51 47 L52 54" stroke="${c}" stroke-width="1" opacity=".5"/><path d="M45.5 55.5 Q47 58 50 57.5 Q53 58 54.5 55.5" stroke="${c}" stroke-width="1.3" fill="none" stroke-linecap="round"/>`;
-    case 'pointed': return `<path d="M50.5 46 L53 55.5 Q51 57.5 48.5 56.5" stroke="${c}" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
     default: return `<path d="M51 46.5 L52 55" stroke="${c}" stroke-width="1" opacity=".55"/><path d="M47 56 Q50 58 53 56" stroke="${c}" stroke-width="1.3" fill="none" stroke-linecap="round"/>`;
   }
 }
@@ -156,7 +150,6 @@ function mouth(look, expr) {
     case 'grin': return `<path d="M43 61 Q50 68.5 57 61 Q50 63 43 61Z" fill="#fff"/><path d="M43 61 Q50 68.5 57 61" stroke="${line}" stroke-width="1.3" fill="none" stroke-linecap="round"/>`;
     case 'smile': return `<path d="M43.5 61.5 Q50 66 56.5 61.5" stroke="${lip}" stroke-width="2" fill="none" stroke-linecap="round"/>`;
     case 'smirk': return `<path d="M44 62.5 Q51 64 56.5 60.5" stroke="${lip}" stroke-width="2" fill="none" stroke-linecap="round"/>`;
-    case 'serious': return `<path d="M44.5 62.5 L55.5 62.5" stroke="${lip}" stroke-width="2" stroke-linecap="round"/>`;
     case 'full': return `<path d="M44 62 Q47 60 50 61 Q53 60 56 62 Q50 65.5 44 62Z" fill="${lip}"/><path d="M44 62 Q50 63 56 62" stroke="${line}" stroke-width=".8" fill="none"/>`;
     case 'sad': return `<path d="M44.5 64 Q50 60.5 55.5 64" stroke="${lip}" stroke-width="2" fill="none" stroke-linecap="round"/>`;
     case 'shock': return `<ellipse cx="50" cy="63" rx="3.2" ry="4" fill="#3a1d16"/>`;
@@ -196,18 +189,18 @@ const DEFS = `<defs>
   <linearGradient id="avBodyShade" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".12"/><stop offset="1" stop-color="#000" stop-opacity=".25"/></linearGradient>
 </defs>`;
 
-/** Returns an SVG string. look: {gender, skin, hair, style, face, eyes, eyeColor, brows, nose, mouth, facial, buff}. */
+/** Returns an SVG string. look: {gender, skin, hair, style, face, eyes, eyeColor, nose, mouth, facial, shirt}. */
 export function avatarSVG(look, { expr = 'neutral', size = 64, cls = '', necklace: neck = false } = {}) {
   const skin = at(SKINS, look.skin ?? 0);
   const L = { ...look, _skin: skin, _dark: (look.skin ?? 0) >= 4 };
   const hair = at(HAIRS, look.hair ?? 0);
   const style = at(HAIR_STYLES, look.style ?? 0);
-  const buff = at(BUFFS, look.buff ?? 0);
+  const shirt = at(SHIRTS, look.shirt ?? look.buff ?? 0);
   const facePath = FACE_PATHS[at(FACES, look.face ?? 0)];
   const ear = shade(skin, -0.08);
   return `<svg class="avatar ${cls}" viewBox="0 0 100 100" width="${size}" height="${size}" aria-hidden="true">${DEFS}
     ${hairBack(style, hair)}
-    ${body(L, buff)}
+    ${body(L, shirt)}
     <path d="M42.5 62 L42.5 78 Q50 82 57.5 78 L57.5 62Z" fill="${shade(skin, -0.1)}"/>
     <path d="M42.5 66 Q50 71 57.5 66 L57.5 62 L42.5 62Z" fill="${shade(skin, -0.22)}" opacity=".6"/>
     <ellipse cx="30" cy="48" rx="3.6" ry="5.5" fill="${ear}"/>
@@ -220,19 +213,18 @@ export function avatarSVG(look, { expr = 'neutral', size = 64, cls = '', necklac
     ${eyes(L, expr)}
     ${nose(L)}
     ${mouth(L, expr)}
-    ${look.headband ? `<path d="M29.5 34 Q50 25 70.5 34 L70.5 39 Q50 30.5 29.5 39Z" fill="${buff}"/>` : ''}
     ${neck ? necklace() : ''}
   </svg>`;
 }
 
 export function randomLook(gender, rnd = Math.random) {
   const r = (n) => Math.floor(rnd() * n);
-  const femStyles = [3, 4, 6, 7, 8, 9, 10, 11, 1];
-  const maleStyles = [0, 1, 2, 3, 4, 5, 12, 6];
+  const femStyles = [3, 4, 6, 7, 8, 9, 10, 11];
+  const maleStyles = [0, 1, 2, 3, 4, 5, 12];
   return {
     gender,
     skin: r(SKINS.length), hair: r(6), style: gender === 'f' ? femStyles[r(femStyles.length)] : maleStyles[r(maleStyles.length)],
-    face: r(FACES.length), eyes: r(EYES.length), eyeColor: r(EYE_COLORS.length), brows: r(BROWS.length),
-    nose: r(NOSES.length), mouth: r(MOUTHS.length), facial: gender === 'f' ? 0 : [0, 0, 1, 2, 3, 4][r(6)], buff: r(BUFFS.length),
+    face: r(FACES.length), eyes: r(EYES.length), eyeColor: r(EYE_COLORS.length),
+    nose: r(NOSES.length), mouth: r(MOUTHS.length), facial: gender === 'f' ? 0 : [0, 0, 1, 2, 3, 4][r(6)], shirt: r(SHIRTS.length),
   };
 }
