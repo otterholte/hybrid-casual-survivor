@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>Island Council</title>
+  <meta name="description" content="A hybrid-casual island survival game: win immunity challenges, scheme at camp, and survive Tribal Council.">
+  <meta name="theme-color" content="#ff7b39">
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Nunito:wght@600;800;900&family=Permanent+Marker&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-scene="day">
+  <div id="scene" aria-hidden="true">
+    <div class="sky"></div>
+    <div class="stars"></div>
+    <div class="sun"></div>
+    <div class="moon"></div>
+    <svg class="world" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMax slice">
+      <path class="far-isle" d="M760 520 Q840 440 930 470 Q1000 430 1070 500 L1100 520 Z"/>
+      <rect class="sea" x="0" y="515" width="1200" height="300"/>
+      <g class="waves">
+        <path d="M0 545 Q50 535 100 545 T200 545 T300 545 T400 545 T500 545 T600 545 T700 545 T800 545 T900 545 T1000 545 T1100 545 T1200 545 T1300 545 T1400 545"/>
+        <path d="M-60 575 Q-10 565 40 575 T140 575 T240 575 T340 575 T440 575 T540 575 T640 575 T740 575 T840 575 T940 575 T1040 575 T1140 575 T1240 575 T1340 575"/>
+      </g>
+      <path class="sand" d="M-20 660 Q300 600 620 640 Q900 670 1220 620 L1220 820 L-20 820 Z"/>
+      <g class="palm" transform="translate(420 700)">
+        <path class="trunk" d="M0 0 Q20 -120 70 -260" />
+        <g transform="translate(70 -260)">
+          <path class="frond" d="M0 0 Q-80 -50 -170 10 Q-80 -25 0 8Z"/>
+          <path class="frond f2" d="M0 0 Q-40 -90 -120 -110 Q-50 -70 0 5Z"/>
+          <path class="frond" d="M0 0 Q60 -90 150 -80 Q70 -60 0 5Z"/>
+          <path class="frond f2" d="M0 0 Q90 -20 170 40 Q80 10 0 8Z"/>
+          <path class="frond" d="M0 0 Q10 -100 40 -150 Q20 -80 0 5Z"/>
+          <circle class="nut" cx="-8" cy="10" r="11"/><circle class="nut" cx="10" cy="12" r="11"/>
+        </g>
+      </g>
+      <g class="palm" transform="translate(800 690) scale(-0.8 0.8)">
+        <path class="trunk" d="M0 0 Q20 -120 70 -260" />
+        <g transform="translate(70 -260)">
+          <path class="frond" d="M0 0 Q-80 -50 -170 10 Q-80 -25 0 8Z"/>
+          <path class="frond f2" d="M0 0 Q-40 -90 -120 -110 Q-50 -70 0 5Z"/>
+          <path class="frond" d="M0 0 Q60 -90 150 -80 Q70 -60 0 5Z"/>
+          <path class="frond f2" d="M0 0 Q90 -20 170 40 Q80 10 0 8Z"/>
+          <circle class="nut" cx="-8" cy="10" r="11"/>
+        </g>
+      </g>
+      <g class="hut" transform="translate(1000 640)">
+        <path class="hut-roof" d="M-80 0 L0 -70 L80 0 Z"/>
+        <rect class="hut-wall" x="-60" y="0" width="120" height="50"/>
+        <rect class="hut-door" x="-14" y="14" width="28" height="36"/>
+      </g>
+    </svg>
+    <div class="vignette"></div>
+  </div>
+  <div id="app"><div id="screen"></div></div>
+  <div id="overlay"></div>
+  <div id="toasts"></div>
+  <button id="muteBtn" aria-label="Toggle sound">🔊</button>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
