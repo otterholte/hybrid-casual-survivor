@@ -1,9 +1,9 @@
 // Back at Camp: talk to anyone (or a group) as much as you like, plus ONE excursion per day (spy or idol search).
 import { game, P, nm, alive, aliveBots, human, adjTrust } from './state.js';
-import { replyTo, botOpener, botConvo, computePlans } from './ai.js';
+import { replyTo, botOpener, botConvo, computePlans, spendAdv } from './ai.js';
 import { chatReply, understand, matchOption, FLAVOR_INTENTS, GROUP_PRESETS, groupReply } from './chat.js';
 import { llm, chatter } from './llm.js';
-import { PRESETS, ZONES } from './data.js';
+import { PRESETS, ZONES, ADVANTAGES } from './data.js';
 import { h, rand, pick, chance, sleep, weightedPick, shuffle, clock } from './util.js';
 import { show, toast, banner, setScene, setMusic, Timer, timerRing, avatarChip, modal } from './ui.js';
 import { avatarSVG } from './avatar.js';
@@ -58,7 +58,8 @@ export function runCamp() {
     const S = game.S, me = human();
     const limit = S.settings.campTimer || 0;
     const day = S.day + 1;
-    let excursionUsed = false;
+    let excursionsLeft = 1;
+    if (me.advantages.includes('extraTrip')) { spendAdv(0, 'extraTrip'); excursionsLeft = 2; }
     S.vibeNoise = {};
     S.threads = S.threads || {};
     S.groups = (S.groups || []).filter((g) => g.members.filter((m) => P(m).alive).length >= 2);
@@ -163,6 +164,7 @@ export function runCamp() {
       if (view === 'inbox') body.replaceChildren(inboxView());
       if (view === 'spy') body.replaceChildren(spyPick());
       if (view === 'search') startSearch();
+      if (view === 'clue') startSearch({ fromClue: true });
     }
 
     const subHead = (title, back = 'hub', extra = null) => h('div', { class: 'sub-head' },
@@ -186,7 +188,8 @@ export function runCamp() {
           h('div', { class: 'sc-ic' }, '💬'),
           h('div', { class: 'sc-mid' }, h('div', { class: 'ac-t' }, 'Strategy'), h('div', { class: 'ac-s' }, 'Talk privately or in groups, as much as you want.')),
           n ? h('span', { class: 'badge' }, `${n} new`) : h('span', { class: 'sc-arrow' }, '›')),
-        h('div', { class: 'feed-title center' }, excursionUsed ? 'EXCURSION USED FOR TODAY' : 'ONE EXCURSION · PICK ONE'),
+        advantagePanel(),
+        h('div', { class: 'feed-title center' }, excursionsLeft <= 0 ? 'EXCURSIONS USED FOR TODAY' : excursionsLeft === 1 ? 'ONE EXCURSION · PICK ONE' : `${excursionsLeft} EXCURSIONS TODAY`),
         h('div', { class: 'action-grid two' },
           excursionCard('🗿', 'Idol Search', 'Find the clue, then race to the idol', 'search', 'a-idol'),
           excursionCard('👀', 'Spy', 'Overhear one castaway', 'spy', 'a-spy')),
@@ -195,8 +198,44 @@ export function runCamp() {
       );
     }
 
+    function advantagePanel() {
+      if (!me.advantages.length) return null;
+      return h('div', { class: 'panel adv-panel' },
+        h('div', { class: 'feed-title' }, 'YOUR ADVANTAGES'),
+        ...me.advantages.map((type) => {
+          const a = ADVANTAGES[type];
+          const use = type === 'intel' ? useIntel : type === 'idolClue' ? useClue : null;
+          return h('div', { class: 'adv-row' },
+            h('span', { class: 'adv-ic' }, a.icon),
+            h('div', { class: 'grow' }, h('b', {}, a.name), h('div', { class: 'muted' }, a.desc)),
+            use ? h('button', { class: 'btn sm', onclick: use }, 'Use') : h('span', { class: 'pill' }, 'At Tribal'));
+        }));
+    }
+
+    async function useIntel() {
+      sfx('click');
+      const id = await pickName('Whose vote do you want to know?', aliveBots().map((b) => b.id));
+      if (id == null) return;
+      spendAdv(0, 'intel');
+      const t = S.plan[id];
+      sfx('reveal');
+      await banner({ title: 'Secret Intel', sub: t == null ? `${nm(id)} hasn\u2019t settled on a vote yet.` : t === 0 ? `${nm(id)} is planning to vote for <b>YOU</b>.` : `${nm(id)} is planning to vote for <b>${nm(t)}</b>.`, icon: avatarSVG(P(id).look, { size: 100 }), tone: 'night', tap: true });
+      if (!finished) render();
+    }
+
+    async function useClue() {
+      spendAdv(0, 'idolClue');
+      if (!S.hiddenIdol) {
+        sfx('fail');
+        await banner({ title: 'Too late', sub: 'Your clue leads to an empty hole. Someone already found the idol.', icon: '📜', tone: 'night', tap: true });
+        if (!finished) render();
+        return;
+      }
+      go('clue');
+    }
+
     function excursionCard(icon, title, sub, v, cls) {
-      return h('button', { class: `action-card ${cls}`, disabled: excursionUsed, onclick: () => go(v) },
+      return h('button', { class: `action-card ${cls}`, disabled: excursionsLeft <= 0, onclick: () => go(v) },
         h('div', { class: 'ac-ic' }, icon), h('div', { class: 'ac-t' }, title), h('div', { class: 'ac-s' }, sub));
     }
 
@@ -450,7 +489,7 @@ export function runCamp() {
       return h('div', { class: 'stack' },
         subHead('Spy on who?'),
         h('p', { class: 'muted center' }, 'This uses your excursion for today. Sneak close, then overhear them for 15 seconds. You might get caught.'),
-        h('div', { class: 'talk-list' }, ...aliveBots().map((b) => h('button', { class: 'talk-row', onclick: () => { excursionUsed = true; startSpy(b.id); } },
+        h('div', { class: 'talk-list' }, ...aliveBots().map((b) => h('button', { class: 'talk-row', onclick: () => { excursionsLeft--; startSpy(b.id); } },
           face(b, 46), h('div', { class: 'tr-mid' }, h('div', { class: 'tr-name' }, b.name), h('div', { class: 'tr-last' }, b.job))))));
     }
 
@@ -526,7 +565,7 @@ export function runCamp() {
     }
 
     // ---------- idol search (excursion): memory match, then a dash ----------
-    function startSearch() {
+    function startSearch(opts = {}) {
       view = 'search-live';
       const diff = S.settings.difficulty;
       const memSecs = { easy: 50, normal: 40, hard: 32 }[diff];
@@ -535,7 +574,8 @@ export function runCamp() {
         subHead('Idol Search'),
         h('p', { class: 'center' }, 'Flip cards to find matching pairs. Match the two ', h('b', {}, '📜 clue'), ' cards to learn where the idol is hidden, then race there before anyone notices you’re gone.'),
         h('p', { class: 'muted center' }, 'This uses your excursion for today.'),
-        h('button', { class: 'btn btn-big', onclick: () => { excursionUsed = true; sfx('click'); memory(); } }, 'Start searching')));
+        h('button', { class: 'btn btn-big', onclick: () => { excursionsLeft--; sfx('click'); memory(); } }, 'Start searching')));
+      if (opts.fromClue) clue();
 
       function memory() {
         S.idolSusp[0] = Math.min(1, S.idolSusp[0] + 0.07);

@@ -60,3 +60,12 @@ export const SEARCH_DUDS = [
   'Sand. Only sand.',
   'A bird took off and nearly gave you a heart attack.',
 ];
+
+// Advantages won in challenges. Big ones go to 1st place, small ones to 2nd.
+export const ADVANTAGES = {
+  extraVote: { name: 'Extra Vote', icon: '🗳️', tier: 'big', when: 'tribal', desc: 'Cast two votes at a Tribal Council of your choice.' },
+  voteBlock: { name: 'Vote Blocker', icon: '🚫', tier: 'big', when: 'tribal', desc: 'Before the vote, stop one castaway from voting.' },
+  intel: { name: 'Secret Intel', icon: '🔍', tier: 'small', when: 'camp', desc: 'At camp, learn who one castaway is really voting for.' },
+  idolClue: { name: 'Idol Clue', icon: '📜', tier: 'small', when: 'camp', desc: 'At camp, go straight to the hidden idol’s location (if it’s still out there).' },
+  extraTrip: { name: 'Extra Excursion', icon: '🧭', tier: 'small', when: 'camp', desc: 'Take a second excursion at camp.' },
+};

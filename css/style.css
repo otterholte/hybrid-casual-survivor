@@ -522,3 +522,30 @@ body.pausable #pauseBtn { display: block; }
 .clue-scroll p { font-size: 17px; font-weight: 700; margin: 8px 0 0; line-height: 1.4; }
 .wrong { animation: shakeX .12s 3; border-color: var(--blood) !important; }
 @keyframes shakeX { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(4px); } }
+
+/* ---------- prizes, podium, advantages ---------- */
+.prizes { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.prize { display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--line-2); border-radius: 12px; padding: 8px 12px; font-size: 14px; text-align: left; }
+.prize.gold { border-color: rgba(233,185,73,.6); background: linear-gradient(90deg, rgba(233,185,73,.18), var(--panel)); }
+.prize .medal { font-size: 24px; }
+.ch-hint { text-align: center; font-family: var(--font-d); letter-spacing: 1.5px; color: var(--gold-2); font-size: 17px; min-height: 0; }
+.ch-hint:empty { display: none; }
+.ch-row.done .ch-bar-fill { background: linear-gradient(90deg, var(--gold), var(--gold-2)); }
+.podium-card { max-width: 440px; }
+.podium { display: flex; align-items: flex-end; justify-content: center; gap: 10px; margin-top: 6px; }
+.pod { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 116px; }
+.pod-medal { font-size: 28px; }
+.pod-name { font-family: var(--font-d); font-size: 20px; letter-spacing: 1px; }
+.pod.me .pod-name { color: var(--fire-2); }
+.pod-prize { font-size: 11.5px; line-height: 1.25; color: #e6d6c2; min-height: 28px; text-align: center; }
+.pod-block { width: 100%; border-radius: 8px 8px 0 0; background: linear-gradient(180deg, #3a2f26, #1d1712); border: 1px solid var(--line-2); font-family: var(--font-d); font-size: 30px; color: var(--muted); display: flex; align-items: center; justify-content: center; }
+.pod-1 .pod-block { height: 80px; background: linear-gradient(180deg, #6b5320, #2b210d); color: var(--gold-2); }
+.pod-2 .pod-block { height: 56px; }
+.pod-3 .pod-block { height: 38px; }
+.pod-1 .chip-face { border-color: var(--gold); box-shadow: 0 0 24px rgba(233,185,73,.6); }
+.adv-panel { display: flex; flex-direction: column; gap: 8px; border-color: rgba(233,185,73,.4); }
+.adv-row { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.adv-row .muted { font-size: 12px; }
+.adv-ic { font-size: 26px; }
+.seat.blocked .chip-face { filter: grayscale(.8); box-shadow: 0 0 0 3px rgba(200,55,58,.6); }
+.seat.blocked::before { content: '🚫'; position: absolute; top: 18px; right: -4px; font-size: 16px; z-index: 3; }

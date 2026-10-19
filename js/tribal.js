@@ -1,6 +1,6 @@
 // Tribal Council: host-led questions, the secret vote, idols, and the vote reading.
 import { game, P, nm, alive, aliveBots, human, pron } from './state.js';
-import { candidates, botVote, botIdolChoice, buildQuestions, botAnswer, humanChoices, learnFromVote, computePlans } from './ai.js';
+import { candidates, botVote, botIdolChoice, buildQuestions, botAnswer, humanChoices, learnFromVote, computePlans, botBlockChoice, botUsesExtraVote, spendAdv } from './ai.js';
 import { h, sleep, pick } from './util.js';
 import { show, banner, setScene, setMusic, Timer, timerRing, avatarChip, modal, tapOrWait } from './ui.js';
 import { avatarSVG } from './avatar.js';
@@ -57,8 +57,14 @@ function finalize(outId, votes, plays, protectedIds) {
 /** Instant resolution for fast-forwarded rounds. */
 export function simulateTribal() {
   const lastChance = alive().length === 4;
+  const blocked = new Set();
+  for (const b of aliveBots()) { const t = botBlockChoice(b.id); if (t != null) blocked.add(t); }
   const votes = {};
-  for (const b of aliveBots()) votes[b.id] = botVote(b.id, candidates(b.id));
+  for (const b of aliveBots()) {
+    if (blocked.has(b.id)) continue;
+    votes[b.id] = botVote(b.id, candidates(b.id));
+    if (botUsesExtraVote(b.id)) votes[`x${b.id}`] = votes[b.id];
+  }
   const plays = botIdols(lastChance);
   const prot = new Set(plays.map((p) => p.for));
   let { top } = tally(votes, prot);
@@ -193,16 +199,50 @@ export async function runTribal({ juror = false } = {}) {
   hostCard('It is time to vote.');
   sfx('boom');
   await sleep(2400);
+  // ----- advantages before the vote -----
+  const blocked = new Set();
+  if (alive().some((p) => p.advantages.includes('voteBlock'))) {
+    hostCard('Before we vote: does anyone have an advantage they want to play?');
+    await sleep(2800);
+    if (meAlive && me.advantages.includes('voteBlock')) {
+      const t = await blockPrompt();
+      if (t != null) { spendAdv(0, 'voteBlock'); blocked.add(t); await announceBlock(0, t); }
+    }
+    for (const b of aliveBots()) {
+      const t = botBlockChoice(b.id);
+      if (t != null && !blocked.has(t)) { blocked.add(t); await announceBlock(b.id, t); }
+    }
+    if (!blocked.size) { hostCard('Nobody? Okay.'); await sleep(1600); }
+  }
+
   const votes = {};
-  for (const b of aliveBots()) votes[b.id] = botVote(b.id, candidates(b.id));
-  if (meAlive) votes[0] = await humanVote(candidates(0), 'Cast your vote');
+  for (const b of aliveBots()) if (!blocked.has(b.id)) votes[b.id] = botVote(b.id, candidates(b.id));
+  if (meAlive && !blocked.has(0)) {
+    votes[0] = await humanVote(candidates(0), 'Cast your vote');
+    if (me.advantages.includes('extraVote') && await extraPrompt()) {
+      spendAdv(0, 'extraVote');
+      votes.x0 = await humanVote(candidates(0), 'Your Extra Vote');
+    }
+  } else if (meAlive) {
+    await banner({ title: 'You can\u2019t vote tonight', sub: 'Your vote was blocked.', icon: '🚫', tone: 'night', tap: true });
+  }
+  const extraBy = [];
+  for (const b of aliveBots()) if (!blocked.has(b.id) && botUsesExtraVote(b.id)) { votes[`x${b.id}`] = botVote(b.id, candidates(b.id)); extraBy.push(b.id); }
   for (const b of aliveBots()) {
+    if (blocked.has(b.id)) continue;
     spotlight(b.id);
     hostCard(`${b.name} goes to vote.`, 'THE VOTE');
     sfx('heartbeat');
     await sleep(850);
   }
   spotlight(null);
+  for (const id of [...(votes.x0 != null ? [0] : []), ...extraBy]) {
+    spotlight(id);
+    answer(id, id === 0 ? 'I played my Extra Vote.' : 'I\u2019m playing an Extra Vote tonight.');
+    sfx('reveal');
+    await banner({ title: 'Extra Vote', sub: `${id === 0 ? 'You' : nm(id)} cast two votes tonight.`, icon: '🗳️', tone: 'gold', tap: true });
+    spotlight(null);
+  }
 
   // ----- idols -----
   const lastChance = alive().length === 4;
@@ -303,6 +343,38 @@ export async function runTribal({ juror = false } = {}) {
         resolve(id);
       }
     });
+  }
+
+  function blockPrompt() {
+    const box = h('div', { class: 'idol-prompt' },
+      h('div', { class: 'idol-big' }, '🚫'),
+      h('div', { class: 'display sm' }, 'Play your Vote Blocker?'),
+      h('p', { class: 'muted' }, 'Pick one castaway. They won\u2019t be able to vote tonight.'),
+      h('div', { class: 'pick-grid' }, ...aliveBots().map((p) => h('button', { class: 'pick', onclick: () => { sfx('click'); box.close(p.id); } }, avatarChip(p, { size: 50 })))),
+      h('button', { class: 'btn btn-dark', onclick: () => { sfx('click'); box.close(null); } }, 'Save it for later'));
+    return modal(box, { dismissable: false });
+  }
+
+  async function announceBlock(by, target) {
+    spotlight(by);
+    answer(by, by === 0 ? `I\u2019m playing a Vote Blocker on ${nm(target)}.` : `I have a Vote Blocker. I\u2019m using it on ${target === 0 ? 'you' : nm(target)}.`);
+    sfx('gasp');
+    await sleep(1800);
+    sfx('reveal');
+    await banner({ title: 'Vote Blocker', sub: `${target === 0 ? 'You' : nm(target)} will not vote tonight.`, icon: '🚫', tone: 'night', tap: true });
+    seatEls[target]?.classList.add('blocked');
+    spotlight(null);
+  }
+
+  function extraPrompt() {
+    const box = h('div', { class: 'idol-prompt' },
+      h('div', { class: 'idol-big' }, '🗳️'),
+      h('div', { class: 'display sm' }, 'Use your Extra Vote?'),
+      h('p', { class: 'muted' }, alive().length === 4 ? 'This is the last Tribal where it can be used.' : 'You\u2019ll write a second name tonight.'),
+      h('div', { class: 'stack' },
+        h('button', { class: 'btn btn-gold', onclick: () => { sfx('click'); box.close(true); } }, 'Cast a second vote'),
+        h('button', { class: 'btn btn-dark', onclick: () => { sfx('click'); box.close(false); } }, 'Save it')));
+    return modal(box, { dismissable: false });
   }
 
   function idolPrompt(isLastChance) {

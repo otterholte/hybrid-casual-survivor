@@ -34,7 +34,7 @@ export function simulateChallenge(ch, players, diff) {
   return { winner: res[0].id, order: res.map((r) => r.id) };
 }
 
-export function runChallenge({ ch, players, diff, final = false, practice = false }) {
+export function runChallenge({ ch, players, diff, final = false, practice = false, prizes = [] }) {
   return new Promise(async (resolve) => {
     setScene('challenge');
     setMusic(null, 'beach');
@@ -52,9 +52,11 @@ export function runChallenge({ ch, players, diff, final = false, practice = fals
         h('div', { class: 'card how', html: ch.how }),
         h('div', { class: 'pill-row' },
           h('span', { class: `pill diff-${diff}` }, diff.toUpperCase()),
-          h('span', { class: 'pill' }, ch.mode === 'race' ? `⏱ First to finish wins` : '⏳ Last one standing'),
+          h('span', { class: 'pill' }, ch.mode === 'race' ? '⏱ Race to finish' : '⏳ Last one standing'),
           goal ? h('span', { class: 'pill' }, `🎯 ${goal} ${ch.unit}`) : null),
-        !practice ? h('div', { class: 'necklace-tease' }, '📿 Win and you cannot be voted out tonight.') : null,
+        !practice ? h('div', { class: 'prizes' },
+          h('div', { class: 'prize gold' }, h('span', { class: 'medal' }, '🥇'), h('div', {}, h('b', {}, '1st: Immunity'), prizes[0] ? ` + ${prizes[0].icon} ${prizes[0].name}` : '')),
+          prizes[1] ? h('div', { class: 'prize' }, h('span', { class: 'medal' }, '🥈'), h('div', {}, h('b', {}, '2nd: '), `${prizes[1].icon} ${prizes[1].name}`)) : null) : null,
         h('div', { class: 'rivals' }, ...bots.map((b) => avatarChip(b, { size: 40 }))),
         h('button', { class: 'btn btn-big', onclick: () => { sfx('click'); go(); } }, "I'm Ready!"),
       );
@@ -78,9 +80,10 @@ export function runChallenge({ ch, players, diff, final = false, practice = fals
     const canvas = h('canvas', { class: 'ch-canvas' });
     const stage = h('div', { class: 'ch-stage' }, canvas);
     const countEl = h('div', { class: 'countdown' });
+    const hint = h('div', { class: 'ch-hint' });
     const scr = h('div', { class: 'screen ch-play' },
       h('div', { class: 'ch-hud' }, h('div', { class: 'ch-title' }, `${ch.icon} ${ch.name}`), timeEl),
-      board, stage, countEl);
+      board, hint, stage, countEl);
     show(scr);
 
     const g = canvas.getContext('2d');
@@ -226,47 +229,58 @@ export function runChallenge({ ch, players, diff, final = false, practice = fals
       flashEl.classList.add('show');
     }
 
+    const finishedAt = {}; // race: id -> finish time
+    const place = (n) => ['1st', '2nd', '3rd', '4th', '5th'][n] || `${n + 1}th`;
+    function noteFinish(id, time) {
+      if (finishedAt[id] != null) return;
+      finishedAt[id] = time;
+      const n = Object.keys(finishedAt).length - 1;
+      const p = players.find((x) => x.id === id);
+      if (practice) return;
+      sfx(n === 0 ? 'fanfare' : 'pop');
+      flash(p.human ? `You finished ${place(n)}!` : `${p.name} finished ${place(n)}${n === 0 ? ' · IMMUNITY' : ''}`);
+      rows[id]?.row.classList.add('done');
+      if (n === 0 && !p.human && !myDone) hint.textContent = prizes[1] ? `Keep going! 2nd place wins ${prizes[1].icon} ${prizes[1].name}` : 'Keep going!';
+    }
+
     function checkEnd() {
       if (practice) {
-        if (myDone || myFail || (limit && t >= limit)) finish(myDone ? me.id : null);
+        if (myDone || myFail || (limit && t >= limit)) finish();
         return;
       }
       if (ch.mode === 'race') {
-        const firstBot = bres.slice().sort((a, b) => a.time - b.time)[0];
-        if (myDone) return finish(me.id);
-        if (firstBot && t >= firstBot.time) return finish(firstBot.id);
-        if (t >= limit) {
-          // Time's up: most progress wins.
-          const myF = myProgress / goal;
-          const best = bres.map((r) => ({ id: r.id, f: Math.min(goal, Math.floor(botFrac(r.id) * goal)) / goal })).sort((a, b) => b.f - a.f)[0];
-          return finish(myF >= best.f ? me.id : best.id);
-        }
+        for (const r of bres) if (t >= r.time) noteFinish(r.id, r.time);
+        if (myDone) noteFinish(me.id, myTime);
+        const done = Object.keys(finishedAt).length;
+        // The race runs until 1st and 2nd are decided. Once you finish, the rest is already known.
+        if (myDone || done >= 2 || t >= limit) return finish();
       } else {
         const still = bres.filter((r) => t < r.time);
-        if (myFail) {
-          const champ = bres.slice().sort((a, b) => b.time - a.time)[0];
-          return finish(champ.time > myTime ? champ.id : me.id, champ.time > myTime);
-        }
-        if (!still.length) return finish(me.id);
+        if (myFail) return finish(still.length > 0);
+        if (!still.length) return finish();
       }
     }
 
-    async function finish(winnerId, fastForward = false) {
+    async function finish(fastForward = false) {
       if (ended) return;
       ended = true;
       running = false;
-      await sleep(fastForward ? 600 : 900);
+      await sleep(fastForward ? 700 : 1100);
       cancelAnimationFrame(raf);
       ro.disconnect();
-      const winner = players.find((p) => p.id === winnerId);
       let order;
       if (ch.mode === 'race') {
-        const mine = myDone ? myTime : limit + (1 - myProgress / Math.max(1, goal)) * 100;
-        order = [{ id: me.id, v: mine }, ...bres.map((r) => ({ id: r.id, v: r.time }))].sort((a, b) => a.v - b.v).map((x) => x.id);
+        // Finished: by time. Everyone else: by how far along they got.
+        const score = (id) => {
+          if (id === me.id) return myDone ? myTime : 1000 + (1 - myProgress / Math.max(1, goal)) * 100;
+          const r = bres.find((x) => x.id === id);
+          if (myDone || t >= r.time) return r.time;
+          return 1000 + (1 - botFrac(id)) * 100;
+        };
+        order = players.map((p) => p.id).sort((a, b) => score(a) - score(b));
       } else {
         order = [{ id: me.id, v: myFail ? myTime : 9999 }, ...bres.map((r) => ({ id: r.id, v: r.time }))].sort((a, b) => b.v - a.v).map((x) => x.id);
       }
-      if (winnerId != null) order = [winnerId, ...order.filter((x) => x !== winnerId)];
       if (practice) {
         const key = `ic_best_${ch.id}_${diff}`;
         const prev = store.get(key, null);
@@ -284,15 +298,10 @@ export function runChallenge({ ch, players, diff, final = false, practice = fals
         await banner({ title: myDone || ch.mode === 'endurance' ? 'Nice!' : "Time's up", sub: line, icon: ch.icon, tap: true });
         return resolve({ winner: null, order });
       }
-      if (winner.human) {
-        sfx('win');
-        await banner({ title: 'YOU WIN IMMUNITY!', sub: myTime ? `${ch.mode === 'race' ? 'Finished' : 'Survived'} in ${myTime.toFixed(1)}s` : '', icon: avatarSVG(me.look, { size: 120, expr: 'happy', necklace: true }), tone: 'gold', tap: true });
-      } else {
-        sfx(myFail || !myDone ? 'fail' : 'drum');
-        const sub = myFail ? `${failMsg} ${winner.name} outlasted everyone.` : `${winner.name} ${ch.mode === 'race' ? 'finished first' : 'outlasted everyone'}.`;
-        await banner({ title: `${winner.name.toUpperCase()} WINS IMMUNITY`, sub, icon: avatarSVG(winner.look, { size: 120, expr: 'happy', necklace: true }), tone: 'gold', tap: true });
-      }
-      resolve({ winner: winnerId, order });
+      const myPlace = order.indexOf(me.id);
+      sfx(myPlace === 0 ? 'win' : myPlace === 1 ? 'fanfare' : 'drum');
+      await podium(order.slice(0, 3).map((id) => players.find((p) => p.id === id)), prizes, myPlace);
+      resolve({ winner: order[0], order });
     }
 
     raf = requestAnimationFrame(frame);
@@ -312,5 +321,36 @@ export function runChallenge({ ch, players, diff, final = false, practice = fals
     running = true;
     last = performance.now();
     setTimeout(() => (countEl.className = 'countdown'), 600);
+  });
+}
+
+/** Podium after a challenge: who won immunity and who earned advantages. */
+export function podium(top, prizes, myPlace) {
+  return new Promise((resolve) => {
+    const medals = ['🥇', '🥈', '🥉'];
+    const title = myPlace === 0 ? 'You win immunity!' : `${top[0].name} wins immunity`;
+    const sub = myPlace === 0 ? (prizes[0] ? `Plus: ${prizes[0].icon} ${prizes[0].name}` : '')
+      : myPlace === 1 ? `You placed 2nd${prizes[1] ? ` and earned ${prizes[1].icon} ${prizes[1].name}` : ''}.`
+      : myPlace === 2 ? 'You placed 3rd. So close.' : `You placed ${myPlace + 1}th.`;
+    const rewards = [`Immunity${prizes[0] ? ` + ${prizes[0].icon} ${prizes[0].name}` : ''}`, prizes[1] ? `${prizes[1].icon} ${prizes[1].name}` : '', ''];
+    const order = [1, 0, 2].filter((i) => top[i]);
+    const wrap = h('div', { class: 'banner-wrap tone-gold' }, h('div', { class: 'letterbox top' }),
+      h('div', { class: 'banner tone-gold podium-card' },
+        h('div', { class: 'banner-title' }, title),
+        sub ? h('div', { class: 'banner-sub' }, sub) : null,
+        h('div', { class: 'podium' }, ...order.map((i) => h('div', { class: `pod pod-${i + 1} ${top[i].human ? 'me' : ''}` },
+          h('div', { class: 'pod-medal' }, medals[i]),
+          h('div', { class: 'chip-face', style: { width: `${i === 0 ? 84 : 62}px`, height: `${i === 0 ? 84 : 62}px` }, html: avatarSVG(top[i].look, { size: i === 0 ? 84 : 62, expr: 'happy', necklace: i === 0 }) }),
+          h('div', { class: 'pod-name' }, top[i].human ? 'You' : top[i].name),
+          rewards[i] ? h('div', { class: 'pod-prize' }, rewards[i]) : null,
+          h('div', { class: 'pod-block' }, String(i + 1))))),
+        h('div', { class: 'banner-tap' }, 'Tap to continue')),
+      h('div', { class: 'letterbox bot' }));
+    document.getElementById('overlay').append(wrap);
+    setTimeout(() => wrap.addEventListener('click', () => {
+      sfx('click');
+      wrap.classList.add('out');
+      setTimeout(() => { wrap.remove(); resolve(); }, 380);
+    }), 700);
   });
 }

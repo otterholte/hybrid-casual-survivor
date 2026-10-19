@@ -3,14 +3,14 @@ import { h, $, pick, shuffle, store } from './util.js';
 import { audio, sfx } from './audio.js';
 import { show, banner, setScene, setMusic, avatarChip, modal, setPausable, openPause } from './ui.js';
 import { avatarSVG, randomLook, SKINS, HAIRS, HAIR_STYLES, HAIR_LABELS, SHIRTS, SHIRT_NAMES, FACES, FACE_NAMES, EYES, EYE_COLORS, NOSES, MOUTHS, FACIAL } from './avatar.js';
-import { ARCHETYPES, PLAYER_JOBS } from './data.js';
+import { ARCHETYPES, PLAYER_JOBS, ADVANTAGES } from './data.js';
 import { game, newSeason, alive, human, P, nm } from './state.js';
-import { beginRoundAI, computePlans } from './ai.js';
+import { beginRoundAI, computePlans, botTakesAdvantage } from './ai.js';
 import { CHALLENGES, byId, runChallenge, simulateChallenge } from './challenges/index.js';
 import { runCamp, simulateCamp, hideIdolIfNeeded } from './camp.js';
 import { runTribal, simulateTribal } from './tribal.js';
 import { finalTribal } from './finale.js';
-import { llm, loadLLM, llmEnabled, setLlmEnabled, MODEL_SIZE } from './llm.js';
+import { llm, loadLLM, llmEnabled, llmChoice, setLlmChoice, MODELS } from './llm.js';
 
 const DEFAULTS = { name: '', castSize: 8, difficulty: 'normal', campTimer: 0, look: randomLook('m') };
 let settings = { ...DEFAULTS, ...store.get('ic_settings2', {}) };
@@ -116,15 +116,15 @@ function setupScreen() {
   const aiSeg = h('div', { class: 'seg' });
   const aiNote = h('div', { class: 'muted', style: { fontSize: '12px' } });
   const paintAi = () => {
-    const on = llmEnabled();
-    aiSeg.replaceChildren(
-      h('button', { class: on ? '' : 'on', onclick: () => { setLlmEnabled(false); sfx('click'); paintAi(); } }, 'Classic'),
-      h('button', { class: on ? 'on' : '', onclick: () => { setLlmEnabled(true); sfx('click'); loadLLM(); paintAi(); } }, 'On-device AI'));
-    aiNote.textContent = !on ? 'Castaways answer from the game’s rules engine.'
-      : llm.status === 'ready' ? `AI ready (${llm.device === 'webgpu' ? 'GPU' : 'CPU'}). Small talk is written live on your device; strategy replies still follow the rules engine.`
-      : llm.status === 'loading' ? `Downloading the AI model once (${MODEL_SIZE})... ${Math.round(llm.progress * 100)}%`
-      : llm.status === 'error' ? 'The AI model couldn’t load on this device. Classic chat will be used.'
-      : `Runs fully on your device after a one-time ${MODEL_SIZE} download. No internet needed afterwards.`;
+    const c = llmChoice();
+    const opt = (v, lab) => h('button', { class: c === v ? 'on' : '', onclick: () => { setLlmChoice(v); sfx('click'); if (v !== 'off') loadLLM(); paintAi(); } }, lab);
+    aiSeg.replaceChildren(opt('off', 'Classic'), opt('light', `Light AI · ${MODELS.light.size}`), opt('best', `Best AI · ${MODELS.best.size}`));
+    const m = MODELS[c];
+    aiNote.textContent = c === 'off' ? 'Castaways answer from the game\u2019s rules engine.'
+      : llm.model === c && llm.status === 'ready' ? `AI ready on your ${llm.device === 'webgpu' ? 'GPU' : 'CPU'}. Small talk is written live on your device; strategy replies still follow the rules engine.`
+      : llm.model === c && llm.status === 'loading' ? `Downloading once (${m.size})... ${Math.round(llm.progress * 100)}%`
+      : llm.model === c && llm.status === 'error' ? 'This model couldn\u2019t load on this device. Classic chat will be used.'
+      : `Runs fully on your device after a one-time ${m.size} download. No internet needed afterwards.`;
   };
   llm.listeners.add(() => { if (aiNote.isConnected) paintAi(); });
   paintAi();
@@ -179,6 +179,23 @@ function practiceScreen() {
 
 // ---------- season ----------
 let challengeBag = [];
+
+function rollPrizes(final) {
+  const S = game.S;
+  const small = ['intel', 'extraTrip'];
+  if (S.hiddenIdol || (S.idolsLeft > 0 && alive().length > 5)) small.push('idolClue', 'idolClue');
+  const big = pick(['extraVote', 'voteBlock']);
+  const sm = final ? 'intel' : pick(small);
+  return [{ id: big, ...ADVANTAGES[big] }, { id: sm, ...ADVANTAGES[sm] }];
+}
+
+function awardPrizes(order, prizes) {
+  order.slice(0, 2).forEach((id, i) => {
+    const p = P(id);
+    p.advantages.push(prizes[i].id);
+    if (!p.human) botTakesAdvantage(id, prizes[i].id);
+  });
+}
 function nextChallenge(final) {
   const S = game.S;
   if (final) {
@@ -209,6 +226,7 @@ async function playSeason() {
     beginRoundAI();
     const final = alive().length === 4;
     const ch = nextChallenge(final);
+    const prizes = rollPrizes(final);
 
     // ----- immunity -----
     let res;
@@ -216,7 +234,7 @@ async function playSeason() {
       setScene('day');
       sfx('boom');
       await banner({ title: `DAY ${S.day}`, sub: final ? 'Final four. One last necklace.' : pick(['The tide is turning.', 'Hunger is setting in.', 'Rain all night. Tempers are short.', 'Somebody is lying. Nobody knows who.']), tone: 'sunset', hold: 2400 });
-      res = await runChallenge({ ch, players: alive(), diff: S.settings.difficulty, final });
+      res = await runChallenge({ ch, players: alive(), diff: S.settings.difficulty, final, prizes });
     } else {
       res = simulateChallenge(ch, alive(), S.settings.difficulty);
     }
@@ -225,10 +243,12 @@ async function playSeason() {
     w.stats.wins++;
     S.threat[w.id] += 0.2;
     S.lastWinner = w.id;
+    awardPrizes(res.order, prizes);
     computePlans();
     if (S.humanOut && !fast) {
       setScene('day');
-      await banner({ title: `${w.name} wins immunity`, sub: `Day ${S.day} · ${ch.name}${final ? ' · Final immunity' : ''}`, icon: avatarSVG(w.look, { size: 120, expr: 'happy', necklace: true }), tone: 'gold', tap: true });
+      const second = P(res.order[1]);
+      await banner({ title: `${w.name} wins immunity`, sub: `Day ${S.day} · ${ch.name}${final ? ' · Final immunity' : ''}<br>${prizes[0].icon} ${w.name} also wins ${prizes[0].name}. ${prizes[1].icon} ${second.name} takes 2nd: ${prizes[1].name}.`, icon: avatarSVG(w.look, { size: 120, expr: 'happy', necklace: true }), tone: 'gold', tap: true });
     }
 
     // ----- camp -----

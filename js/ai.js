@@ -553,10 +553,11 @@ export function learnFromVote(votes, outId) {
     } else if (hv === promised) adjTrust(id, H, 0.08);
   }
   for (const [v, t] of Object.entries(votes)) {
+    if (!/^\d+$/.test(v)) continue; // extra votes are keyed x<id>
     const voter = +v;
     if (t === outId) P(voter).stats.correctVotes++;
     if (P(t).alive && t !== voter && chance(0.5)) adjTrust(t, voter, -0.2);
-    for (const [v2, t2] of Object.entries(votes)) if (+v2 !== voter && t2 === t) adjTrust(voter, +v2, 0.06);
+    for (const [v2, t2] of Object.entries(votes)) if (/^\d+$/.test(v2) && +v2 !== voter && t2 === t) adjTrust(voter, +v2, 0.06);
   }
 }
 
@@ -610,4 +611,41 @@ export function ftcEffect(answerId) {
     bonus[j] = d;
   }
   return bonus;
+}
+
+// ------------------------------------------------------------------
+// Advantages
+// ------------------------------------------------------------------
+const hasAdv = (id, type) => P(id).advantages.includes(type);
+export function spendAdv(id, type) {
+  const a = P(id).advantages, i = a.indexOf(type);
+  if (i >= 0) a.splice(i, 1);
+}
+
+/** Called right after a bot wins an advantage; camp-only ones are used immediately. */
+export function botTakesAdvantage(botId, type) {
+  const s = S();
+  if (type === 'idolClue') {
+    spendAdv(botId, type);
+    if (s.hiddenIdol) { s.hiddenIdol = null; P(botId).idols++; P(botId).stats.idolsFound++; s.idolSusp[botId] = Math.min(1, s.idolSusp[botId] + 0.2); }
+  }
+  if (type === 'intel' || type === 'extraTrip') spendAdv(botId, type);
+}
+
+export function botBlockChoice(botId) {
+  if (!hasAdv(botId, 'voteBlock')) return null;
+  const s = S(), last = alive().length === 4;
+  if (!last && perceivedDanger(botId) < 0.3 && !chance(0.25)) return null;
+  const voters = alive().filter((p) => p.id !== botId);
+  const against = voters.filter((p) => !p.human && s.plan[p.id] === botId);
+  const target = against.length ? pick(against).id : voters.slice().sort((a, b) => s.trust[botId][a.id] - s.trust[botId][b.id])[0]?.id;
+  if (target == null) return null;
+  spendAdv(botId, 'voteBlock');
+  return target;
+}
+
+export function botUsesExtraVote(botId) {
+  if (!hasAdv(botId, 'extraVote')) return false;
+  if (alive().length === 4 || chance(0.55)) { spendAdv(botId, 'extraVote'); return true; }
+  return false;
 }

@@ -8,7 +8,7 @@ A hybrid-casual, island-survival party game: a season of a reality competition s
 
 | Phase | Time | What happens |
 | --- | --- | --- |
-| 📿 **Immunity Challenge** | 30–90s | A one-action skill game. First to finish (or last one standing) wins the necklace and can't be voted out. |
+| 📿 **Immunity Challenge** | 30–90s | A one-action skill game. The race keeps going until 1st and 2nd are decided: 1st wins immunity plus a big advantage, 2nd wins a smaller advantage. |
 | 🏝️ **Back at Camp** | your pace | Talk to anyone, one-on-one or in groups, as much as you like. Plus one excursion per day: spy on a castaway or search for a hidden immunity idol. Optional time limit. |
 | 🔥 **Tribal Council** | ~4 min | The host questions specific castaways (you answer by multiple choice), then everyone votes in secret. Idols are played before the votes are read on a big vote board. |
 | ⚖️ **Final Tribal** | — | Everyone voted out sits on the jury. The final three plead their case and the jury crowns the **Island Champion**. |
@@ -24,6 +24,18 @@ A hybrid-casual, island-survival party game: a season of a reality competition s
 
 Every challenge has Easy / Normal / Hard tuning and a **Practice** mode with personal bests.
 
+## Advantages
+
+| Advantage | Won by | What it does |
+| --- | --- | --- |
+| 🗳️ Extra Vote | 1st place | Cast two votes at a Tribal Council of your choice. |
+| 🚫 Vote Blocker | 1st place | Before the vote, stop one castaway from voting. |
+| 🔍 Secret Intel | 2nd place | At camp, learn who one castaway is really voting for. |
+| 📜 Idol Clue | 2nd place | At camp, go straight to the hidden idol's location. |
+| 🧭 Extra Excursion | 2nd place | Take a second excursion at camp. |
+
+Bots win and play advantages too, so watch the podium.
+
 ## Camp strategy
 
 - **Messages**: an inbox of every castaway with a preview of their latest message. Unread conversations are highlighted, and when someone asks you something you can tap a quick reply (Yes / Maybe / Not them / a name) right from the list.
@@ -36,7 +48,12 @@ Bots remember promises. If you tell someone you're voting one way and then don't
 
 ### On-device AI chat (optional)
 
-Turn on **Castaway chat → On-device AI** in setup to have castaways answer small talk and off-script questions in their own words using [LFM2.5-350M](https://huggingface.co/onnx-community/LFM2.5-350M-ONNX), a small language model that runs entirely on your device via [Transformers.js](https://github.com/huggingface/transformers.js). It downloads once (~300 MB) and then works offline; nothing is sent to an API. Strategy replies (votes, alliances, warnings) still come from the game's rules engine so a castaway's words always match their actions.
+In setup, **Castaway chat** offers two on-device models that answer small talk and off-script questions in character. They run entirely on your device via [Transformers.js](https://github.com/huggingface/transformers.js), download once, then work offline; nothing is sent to an API.
+
+- **Light AI** (~120 MB): [SmolLM2-135M-Instruct](https://huggingface.co/onnx-community/SmolLM2-135M-Instruct-ONNX-GQA). Fast, sometimes rambly.
+- **Best AI** (~300 MB): [LFM2.5-350M](https://huggingface.co/onnx-community/LFM2.5-350M-ONNX). Noticeably more coherent.
+
+Strategy replies (votes, alliances, warnings) always come from the game's rules engine, so a castaway's words match their actions.
 
 ## Your castaway
 

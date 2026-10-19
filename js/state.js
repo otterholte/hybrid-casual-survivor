@@ -22,7 +22,7 @@ export function newSeason(settings) {
   ];
   for (const p of players) {
     Object.assign(p, {
-      alive: true, immune: false, idols: 0, juror: false, placement: null, outDay: null,
+      alive: true, immune: false, idols: 0, advantages: [], juror: false, placement: null, outDay: null,
       stats: { wins: 0, votesAgainst: 0, idolsFound: 0, idolsPlayed: 0, idolSaves: 0, correctVotes: 0, betrayals: 0 },
     });
   }
