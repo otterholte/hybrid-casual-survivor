@@ -181,3 +181,41 @@ export function shade(hex, amt) {
   const f = (c) => Math.max(0, Math.min(255, Math.round(c + (amt > 0 ? (255 - c) * amt : c * amt))));
   return `rgb(${f((n >> 16) & 255)},${f((n >> 8) & 255)},${f(n & 255)})`;
 }
+
+/** Joystick-style control pad. (kx, ky) is the knob offset in -1..1. */
+export function controlPad(g, pad, kx = 0, ky = 0) {
+  g.fillStyle = 'rgba(0,0,0,.35)';
+  g.beginPath(); g.arc(pad.x, pad.y, pad.r + 10, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,.25)'; g.lineWidth = 2;
+  g.beginPath(); g.arc(pad.x, pad.y, pad.r, 0, Math.PI * 2); g.stroke();
+  g.fillStyle = 'rgba(255,255,255,.35)';
+  for (let k = 0; k < 4; k++) {
+    const a = (k * Math.PI) / 2;
+    g.save(); g.translate(pad.x + Math.cos(a) * (pad.r - 12), pad.y + Math.sin(a) * (pad.r - 12)); g.rotate(a);
+    g.beginPath(); g.moveTo(6, 0); g.lineTo(-4, -6); g.lineTo(-4, 6); g.fill(); g.restore();
+  }
+  const x = pad.x + kx * pad.r * 0.8, y = pad.y + ky * pad.r * 0.8, r = pad.r * 0.36;
+  const kg = g.createRadialGradient(x - r * 0.3, y - r * 0.3, 3, x, y, r);
+  kg.addColorStop(0, '#ffb36b'); kg.addColorStop(1, '#c4520f');
+  g.fillStyle = kg;
+  g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,.4)'; g.lineWidth = 2; g.stroke();
+}
+
+/** Horizontal slider with a knob at s in -1..1. */
+export function slider(g, x0, x1, y, s, label) {
+  g.strokeStyle = 'rgba(0,0,0,.45)'; g.lineWidth = 16; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(x0, y); g.lineTo(x1, y); g.stroke();
+  g.strokeStyle = 'rgba(255,255,255,.2)'; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(x0, y); g.lineTo(x1, y); g.stroke();
+  const kx = x0 + ((s + 1) / 2) * (x1 - x0);
+  const kg = g.createRadialGradient(kx - 6, y - 6, 3, kx, y, 22);
+  kg.addColorStop(0, '#ffb36b'); kg.addColorStop(1, '#c4520f');
+  g.fillStyle = kg;
+  g.beginPath(); g.arc(kx, y, 20, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,.4)'; g.lineWidth = 2; g.stroke();
+  if (label) {
+    g.fillStyle = 'rgba(255,255,255,.8)'; g.font = '18px "Bebas Neue", sans-serif'; g.textAlign = 'center';
+    g.fillText(label, (x0 + x1) / 2, y + 40);
+  }
+}

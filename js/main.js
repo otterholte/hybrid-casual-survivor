@@ -200,7 +200,7 @@ function awardPrizes(order, prizes) {
 function nextChallenge(final) {
   const S = game.S;
   if (final) {
-    const opts = ['coconut', 'spiral', 'balance'].filter((id) => id !== S.usedChallenges.at(-1));
+    const opts = ['fire', 'fire', 'coconut', 'spiral'].filter((id) => id !== S.usedChallenges.at(-1));
     const id = pick(opts);
     S.usedChallenges.push(id);
     return byId(id);

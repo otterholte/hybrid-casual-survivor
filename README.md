@@ -21,6 +21,13 @@ A hybrid-casual, island-survival party game: a season of a reality competition s
 - 🗿 **Totem Stack**: drop sliding carved blocks; overhang is chopped off.
 - ⚖️ **Ball Balance**: steer a rope-held disc with a control pad below it to keep every ball aboard as wind picks up.
 - ⭕ **Ring Toss**: swipe to flick rope rings onto all four poles.
+- 🌀 **Tilt Maze**: tilt a wooden maze with the control pad and roll three balls into the slot, dodging holes.
+- 🪵 **Wobble Table**: slide a counterweight to keep a see-saw level as blocks keep landing on it.
+- 🪣 **Fill the Bucket**: catch water from a swinging spout and carry it to the barrel. Coconuts knock water out.
+- 🔥 **Fire Making**: strike the flint along the arrow, then feed and blow the fire until it burns through the rope. Often the final challenge.
+- 🎋 **Pole Balance**: keep a bamboo pole standing on your paddle as the wind gusts get stronger.
+- 🧱 **Shape Puzzle**: drag and rotate carved pieces to fill a silhouette.
+- 🎳 **Ball Roll**: flick balls up a lane into scoring holes; only slow balls drop in.
 
 Every challenge has Easy / Normal / Hard tuning and a **Practice** mode with personal bests.
 
