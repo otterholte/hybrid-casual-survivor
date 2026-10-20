@@ -1,6 +1,7 @@
 // Final Tribal Council: the jury questions the finalists and crowns a champion.
 import { game, P, nm, alive, human } from './state.js';
-import { juryScore, ftcEffect, FTC_ANSWERS, JURY_QUESTIONS } from './ai.js';
+import { juryScore } from './ai.js';
+import { juryQuestion, ftcOptions, judgeSpeech, jurorReaction } from './ftc.js';
 import { h, sleep, pick, rand, shuffle } from './util.js';
 import { show, banner, setScene, setMusic, avatarChip, tapOrWait } from './ui.js';
 import { avatarSVG } from './avatar.js';
@@ -53,11 +54,16 @@ export async function finalTribal() {
   const addBonus = (f, b, mult = 1, onlyJ = null) => {
     for (const [j, v] of Object.entries(b)) if (onlyJ == null || +j === onlyJ) bonus[f][j] = (bonus[f][j] || 0) + v * mult;
   };
-  const choose = () => new Promise((resolve) => {
+  // Your answer: three options written for this exact question from your record, or type your own.
+  const choose = (kind, ctx) => new Promise((resolve) => {
+    const input = h('input', { class: 'chat-input', placeholder: 'Or say it in your own words...', maxlength: 240 });
+    const form = h('form', { class: 'chat-form ftc-own' }, input, h('button', { class: 'btn sm', type: 'submit' }, 'Say it'));
+    form.addEventListener('submit', (e) => { e.preventDefault(); const v = input.value.trim(); if (v) { sfx('click'); resolve(v); } });
     controls.replaceChildren(h('div', { class: 'choices' }, h('div', { class: 'ch-q' }, 'YOUR ANSWER'),
-      ...FTC_ANSWERS.map((a) => h('button', { class: 'choice', onclick: () => { sfx('click'); resolve(a); } }, a.label))));
+      ...ftcOptions(kind, ctx).map((a) => h('button', { class: 'choice', onclick: () => { sfx('click'); resolve(a.text); } }, a.label)),
+      form));
   });
-  const spoken = (a) => a.label.split(': ')[1].replace(/"/g, '');
+  const BOT_TONE = { move: 'strategic', threat: 'strategic', challenges: 'strategic', lie: 'loyal', betrayal: 'loyal', why_me: 'loyal', deserve: 'social', low: 'social', regret: 'social' };
 
   card(null, 'Finalists, this is your last chance to make your case. Let’s start with opening statements.');
   sfx('question');
@@ -67,10 +73,10 @@ export async function finalTribal() {
     card(null, `${nm(f)}, your opening statement.`);
     await sleep(1200);
     if (P(f).human) {
-      const a = await choose();
+      const text = await choose('opening', { other: finalists.find((x) => x !== 0) });
       controls.replaceChildren();
-      answer(0, spoken(a));
-      addBonus(0, ftcEffect(a.id), 0.6);
+      answer(0, text);
+      addBonus(0, judgeSpeech(text, { kind: 'opening' }).bonus, 0.6);
       await beat(3000);
     } else {
       const tone = pick(['strategic', 'loyal', 'social']);
@@ -83,25 +89,25 @@ export async function finalTribal() {
 
   const askers = shuffle(jurors.filter((j) => !P(j).human)).slice(0, 3);
   for (const j of askers) {
-    const q = pick(JURY_QUESTIONS);
     const target = me.alive && Math.random() < 0.6 ? 0 : pick(finalists);
+    const q = juryQuestion(j, target, finalists);
+    const ctx = { kind: q.kind, asker: j, other: finalists.find((x) => x !== target) };
     spotlight(target);
     card(j, `${nm(target)}: ${q.q}`);
     sfx('question');
     await sleep(1800);
     if (P(target).human) {
-      const a = await choose();
+      const text = await choose(q.kind, ctx);
       controls.replaceChildren();
-      answer(0, spoken(a));
-      const b = ftcEffect(a.id);
-      addBonus(0, b, 0.5);
-      addBonus(0, b, 1.5, j);
+      answer(0, text);
+      const judged = judgeSpeech(text, ctx);
+      addBonus(0, judged.bonus, 0.8);
       await sleep(1600);
-      const reply = (b[j] || 0) > 0.05 ? pick(['...Okay. I respect that.', 'That’s what I needed to hear.']) : pick(['Hm. Not convinced.', 'We’ll see.']);
+      const reply = jurorReaction(j, judged, ctx);
       answer(j, reply);
       await beat(readMs(reply));
     } else {
-      const text = pick(BOT_ANSWERS[q.tone]);
+      const text = pick(BOT_ANSWERS[BOT_TONE[q.kind] || pick(['strategic', 'loyal', 'social'])]);
       answer(target, text);
       bonus[target][j] = (bonus[target][j] || 0) + rand(-0.15, 0.25);
       await beat(readMs(text));

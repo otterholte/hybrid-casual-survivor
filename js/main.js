@@ -2,6 +2,7 @@
 import { h, $, pick, shuffle, store } from './util.js';
 import { audio, sfx } from './audio.js';
 import { show, banner, setScene, setMusic, avatarChip, modal, setPausable, openPause } from './ui.js';
+import { openStats, statsPanel } from './stats.js';
 import { avatarSVG, randomLook, SKINS, HAIRS, HAIR_STYLES, HAIR_LABELS, SHIRTS, SHIRT_NAMES, FACES, FACE_NAMES, EYES, EYE_COLORS, NOSES, MOUTHS, FACIAL } from './avatar.js';
 import { ARCHETYPES, PLAYER_JOBS, ADVANTAGES } from './data.js';
 import { game, newSeason, alive, human, P, nm } from './state.js';
@@ -23,6 +24,7 @@ const paintMute = () => (muteBtn.textContent = audio.muted ? '🔇' : '🔊');
 paintMute();
 muteBtn.addEventListener('click', () => { audio.init(); audio.setMuted(!audio.muted); paintMute(); });
 $('#pauseBtn').addEventListener('click', () => openPause({ onHowTo: howTo }));
+$('#statsBtn').addEventListener('click', () => openStats());
 window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.body.classList.contains('pausable')) openPause({ onHowTo: howTo }); });
 const unlock = () => audio.init();
 window.addEventListener('pointerdown', unlock, { capture: true });
@@ -355,6 +357,7 @@ function endScreen(winnerId) {
         h('span', { class: 'mini', html: avatarSVG(p.look, { size: 30, expr: p.placement === 1 ? 'happy' : 'neutral' }) }),
         h('span', { class: 'sr-name' }, p.human ? `${p.name} (you)` : p.name),
         h('span', { class: 'sr-info' }, `📿${p.stats.wins} · 🗳️${p.stats.votesAgainst}`)))),
+    h('div', { class: 'panel' }, h('div', { class: 'feed-title' }, 'EVERYONE’S STATS'), statsPanel({ reveal: true })),
     h('div', { class: 'stack' },
       h('button', { class: 'btn btn-big', onclick: () => { sfx('click'); playSeason(); } }, 'Play another season'),
       h('button', { class: 'btn btn-ghost', onclick: () => { sfx('click'); titleScreen(); } }, 'Main menu')),
