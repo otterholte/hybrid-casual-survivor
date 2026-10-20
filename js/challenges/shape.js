@@ -77,7 +77,8 @@ export default {
   unit: 'pieces',
   create(api) {
     const { W, H, diff } = api;
-    const [cols, rows, remove, k, spin] = { easy: [4, 4, 2, 4, false], normal: [5, 4, 2, 5, true], hard: [6, 4, 3, 6, true] }[diff];
+    // Normal hands you pieces already the right way up (tap still rotates); hard scrambles them.
+    const [cols, rows, remove, k, spin] = { easy: [4, 4, 2, 4, false], normal: [5, 4, 2, 5, false], hard: [6, 4, 3, 6, true] }[diff];
     const { mask, pieces: raw } = makePuzzle(cols, rows, remove, k);
     const CELL = 48, TCELL = 26;
     const bx = Math.round((W - cols * CELL) / 2), by = 76;
@@ -100,6 +101,16 @@ export default {
       return p.cells.every(([c, r]) => { const key = `${at.c + c},${at.r + r}`; return maskSet.has(key) && !occ.has(key); });
     };
     const covered = () => occupied(null).size;
+    // Where a dragged piece would land: the nearest spot within one cell that fits.
+    const landing = (p, x, y) => {
+      const [w, h] = dims(p);
+      const fx = (x - (w * CELL) / 2 - bx) / CELL, fy = (y - (h * CELL) / 2 - 50 - by) / CELL;
+      const base = { c: Math.round(fx), r: Math.round(fy) };
+      const tries = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]
+        .map(([dc, dr]) => ({ c: base.c + dc, r: base.r + dr }))
+        .sort((a, b) => Math.hypot(a.c - fx, a.r - fy) - Math.hypot(b.c - fx, b.r - fy));
+      return tries.find((at) => fits(p, at)) || null;
+    };
     const report = () => {
       const cov = covered();
       api.progress(Math.round((cov / mask.length) * k));
@@ -146,6 +157,16 @@ export default {
           g.fillStyle = 'rgba(0,0,0,.18)'; rr(g, s.x, s.y, s.w, s.h, 14); g.fill();
           if (!p.at && p !== drag?.p) { const o = trayOrigin(p); drawPiece(g, p, o.x, o.y, TCELL); }
         }
+        if (drag && drag.moved) {
+          const at = landing(drag.p, drag.x, drag.y);
+          if (at) {
+            g.save(); g.globalAlpha = 0.35;
+            drawPiece(g, drag.p, bx + at.c * CELL, by + at.r * CELL, CELL);
+            g.restore();
+            g.strokeStyle = 'rgba(123,192,67,.9)'; g.lineWidth = 3;
+            for (const [c, r] of drag.p.cells) { rr(g, bx + (at.c + c) * CELL + 2, by + (at.r + r) * CELL + 2, CELL - 4, CELL - 4, 6); g.stroke(); }
+          }
+        }
         if (drag) {
           const [w, h] = dims(drag.p);
           g.save(); g.globalAlpha = 0.92;
@@ -175,9 +196,8 @@ export default {
           if (p.at && !fits(p, p.at)) p.at = null;
           api.sfx('tick');
         } else {
-          const [w, h] = dims(p);
-          const at = { c: Math.round((drag.x - (w * CELL) / 2 - bx) / CELL), r: Math.round((drag.y - (h * CELL) / 2 - 50 - by) / CELL) };
-          if (fits(p, at)) { p.at = at; api.sfx('clack'); }
+          const at = landing(p, drag.x, drag.y);
+          if (at) { p.at = at; api.sfx('clack'); }
           else { p.at = null; api.sfx(drag.y < 320 ? 'fail' : 'tick'); }
         }
         drag = null;

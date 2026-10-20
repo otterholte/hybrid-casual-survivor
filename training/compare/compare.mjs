@@ -9,6 +9,12 @@ import { join } from 'node:path';
 import { MODELS, buildMessages, vetReply, GEN_OPTS } from '../../js/llm.js';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
+// The game now ships only Island AI; the off-the-shelf models from REPORT.md stay here for comparisons
+// (they get the same short persona prompt the game uses).
+const BASELINES = {
+  light: { remote: 'onnx-community/SmolLM2-135M-Instruct-ONNX-GQA' },
+  best: { remote: 'onnx-community/LFM2.5-350M-ONNX' },
+};
 env.localModelPath = join(HERE, '../../models/');
 
 // Held out of training (training/camp_lines.py EVAL_QUESTIONS).
@@ -34,7 +40,7 @@ const runs = process.argv.slice(2).length ? process.argv.slice(2) : ['tuned:q4',
 const results = [];
 for (const run of runs) {
   const [key, dtype] = run.split(':');
-  const m = MODELS[key];
+  const m = MODELS[key] ?? BASELINES[key];
   const local = !!m.local;
   env.allowLocalModels = local;
   env.allowRemoteModels = !local;

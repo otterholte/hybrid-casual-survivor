@@ -25,9 +25,8 @@ A hybrid-casual, island-survival party game: a season of a reality competition s
 - 🪵 **Wobble Table**: slide a counterweight to keep a see-saw level as blocks keep landing on it.
 - 🪣 **Fill the Bucket**: catch water from a swinging spout and carry it to the barrel. Coconuts knock water out.
 - 🔥 **Fire Making**: strike the flint along the arrow, then feed and blow the fire until it burns through the rope. Often the final challenge.
-- 🎋 **Pole Balance**: keep a bamboo pole standing on your paddle as the wind gusts get stronger.
 - 🧱 **Shape Puzzle**: drag and rotate carved pieces to fill a silhouette.
-- 🎳 **Ball Roll**: flick balls up a lane into scoring holes; only slow balls drop in.
+- 🎳 **Ball Roll**: drag to aim, then stop a fast power meter in the green. A sliding blocker guards the 50 hole and pegs deflect sloppy shots; only slow balls drop in.
 
 Every challenge has Easy / Normal / Hard tuning and a **Practice** mode with personal bests.
 
@@ -53,13 +52,9 @@ Bots win and play advantages too, so watch the podium.
 
 Bots remember promises. If you tell someone you're voting one way and then don't, they'll know, and so will the jury.
 
-### On-device AI chat (optional)
+### On-device AI chat
 
-In setup, **Castaway chat** offers on-device models that answer small talk and off-script questions in character. They run entirely on your device via [Transformers.js](https://github.com/huggingface/transformers.js); nothing is sent to an API.
-
-- **Island AI** (~87 MB, bundled): our own SmolLM2-135M fine-tune, trained on camp talk for every castaway archetype. Fastest and most in-character. Training pipeline and comparison in [`training/`](training/REPORT.md).
-- **Light AI** (~120 MB download): [SmolLM2-135M-Instruct](https://huggingface.co/onnx-community/SmolLM2-135M-Instruct-ONNX-GQA). Fast, often rambly.
-- **Best AI** (~300 MB download): [LFM2.5-350M](https://huggingface.co/onnx-community/LFM2.5-350M-ONNX). Coherent, but sometimes drifts off the island.
+Castaways write their own small talk with **Island AI**, our SmolLM2-135M fine-tune trained on camp talk for every castaway archetype (~87 MB, bundled with the game). It runs entirely on your device via [Transformers.js](https://github.com/huggingface/transformers.js); nothing is sent to an API. If it can't load, castaways fall back to scripted small talk. Training pipeline and comparison with off-the-shelf models: [`training/`](training/REPORT.md).
 
 Strategy replies (votes, alliances, warnings) always come from the game's rules engine, so a castaway's words match their actions.
 

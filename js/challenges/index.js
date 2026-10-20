@@ -9,7 +9,6 @@ import maze from './maze.js';
 import wobble from './wobble.js';
 import bucket from './bucket.js';
 import fire from './fire.js';
-import pole from './pole.js';
 import shape from './shape.js';
 import roll from './roll.js';
 import { h, rand, sleep, clamp, store, clock } from '../util.js';
@@ -17,7 +16,7 @@ import { show, banner, setScene, setMusic, avatarChip } from '../ui.js';
 import { sfx } from '../audio.js';
 import { avatarSVG } from '../avatar.js';
 
-export const CHALLENGES = [coconut, spiral, slide, totem, balance, ring, maze, wobble, bucket, fire, pole, shape, roll];
+export const CHALLENGES = [coconut, spiral, slide, totem, balance, ring, maze, wobble, bucket, fire, shape, roll];
 export const byId = (id) => CHALLENGES.find((c) => c.id === id);
 
 const W = 400, H = 670;

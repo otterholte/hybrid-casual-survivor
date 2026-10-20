@@ -1,33 +1,23 @@
-// Optional on-device language model that gives castaways their own voice in chat.
-// The game's rules engine still decides what a castaway thinks and does; the model only
-// handles small talk, and we fall back to the rules answer if it drifts or is slow.
+// On-device language model that gives castaways their own voice in chat: Island AI, our own
+// fine-tune (training/), bundled with the game. The rules engine still decides what a castaway
+// thinks and does; the model only handles small talk, and we fall back to the rules answer if it
+// drifts, is slow, or can't load on this device.
 import { ARCHETYPES } from './data.js';
-import { store } from './util.js';
 
 const LIB = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0';
-// `local` models ship with the game under /models/<id>; `remote` is the Hugging Face fallback.
-// Island is our own fine-tune (training/). It uses the q4 file on GPU too: fp16 activations
-// (q4f16) noticeably garble a model this small.
+// Ships under /models/<local>; set `remote` to a Hugging Face repo id to download it instead.
+// The q4 file is used on GPU too: fp16 activations (q4f16) garble a model this small.
 export const MODELS = {
   tuned: { local: 'island-chat', remote: null, size: '~87 MB', dtype: 'q4', gpuDtype: 'q4', label: 'Island', tuned: true },
-  light: { remote: 'onnx-community/SmolLM2-135M-Instruct-ONNX-GQA', size: '~120 MB', dtype: 'int8', gpuDtype: 'q4f16', label: 'Light' },
-  best: { remote: 'onnx-community/LFM2.5-350M-ONNX', size: '~300 MB', dtype: 'q4', gpuDtype: 'q4f16', label: 'Best' },
 };
 
 export const llm = { status: 'off', progress: 0, error: null, gen: null, model: null, listeners: new Set() };
 const emit = () => llm.listeners.forEach((fn) => fn(llm));
 
-/** 'off' | 'tuned' | 'light' | 'best' */
-export const llmChoice = () => {
-  const v = store.get('ic_llm', 'off');
-  return v === true ? 'best' : MODELS[v] ? v : 'off';
-};
-export const llmEnabled = () => llmChoice() !== 'off';
-export const setLlmChoice = (v) => store.set('ic_llm', v);
+export const llmChoice = () => 'tuned';
 
 export async function loadLLM() {
   const choice = llmChoice();
-  if (choice === 'off') return;
   if ((llm.status === 'ready' || llm.status === 'loading') && llm.model === choice) return;
   const m = MODELS[choice];
   llm.status = 'loading';
@@ -82,27 +72,13 @@ export async function loadLLM() {
 
 const namesIn = (text, names) => names.filter((n) => new RegExp(`\\b${n}\\b`, 'i').test(text));
 
-// A few example exchanges teach an off-the-shelf model what camp talk on a survival show sounds like.
-const EXAMPLES = [
-  ['how is camp treating you?', 'Rough. Rice for breakfast, rice for dinner. But I’m hanging in there.'],
-  ['you nervous about tonight?', 'Everybody’s nervous. Anyone who says they’re not is lying to you.'],
-  ['what do you miss most from home?', 'A real bed. And coffee. I’d trade my torch for a coffee right now.'],
-  ['that challenge was crazy', 'I’m still shaking. My arms are completely gone.'],
-];
-
 /** The persona prompt the Island model was trained on (training/gen_dataset.py system_prompt). */
 const tunedSystem = (bot, mood) =>
   `You are ${bot.name}, a ${bot.job.toLowerCase()} on an island survival game show. Personality: ${ARCHETYPES[bot.arch]?.label || 'Castaway'}. ${mood || ''}`.trim();
 
-/** Chat messages for one reply. The tuned model needs only its persona; others get a long brief and examples. */
+/** Chat messages for one reply: just the persona the model was trained with, then the message. */
 export function buildMessages(modelKey, { bot, message, mood }) {
-  if (MODELS[modelKey]?.tuned) return [{ role: 'system', content: tunedSystem(bot, mood) }, { role: 'user', content: message }];
-  const arch = ARCHETYPES[bot.arch];
-  return [
-    { role: 'system', content: `You are ${bot.name}, a ${bot.job.toLowerCase()} and a contestant on a TV survival game where castaways live on an island, win immunity challenges, and vote each other out at Tribal Council. Personality: ${arch?.label || 'castaway'}. ${mood || ''} You are chatting privately at camp. Answer in one short, casual sentence, like a real contestant. Stay on the island: talk about camp life, hunger, weather, challenges, nerves, and the game. Never mention anyone by name and never say who you will vote for.` },
-    ...EXAMPLES.flatMap(([q, a]) => [{ role: 'user', content: q }, { role: 'assistant', content: a }]),
-    { role: 'user', content: message },
-  ];
+  return [{ role: 'system', content: tunedSystem(bot, mood) }, { role: 'user', content: message }];
 }
 
 export const GEN_OPTS = { max_new_tokens: 40, do_sample: true, temperature: 0.7, top_p: 0.9, repetition_penalty: 1.15 };

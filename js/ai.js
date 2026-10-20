@@ -221,23 +221,27 @@ export function replyTo(botId, presetId, target, freeText) {
       if (X == null) return { text: 'Not yet. Nobody’s locked in on anything. Who are you thinking?', options: askedWho(botId) };
       const need = Math.floor(alive().length / 2) + 1;
       const on = aliveBots().filter((k) => k.id !== X && s.plan[k.id] === X);
-      const meIn = on.some((k) => k.id === botId);
+      let meIn = on.some((k) => k.id === botId);
       const youIn = s.promises[botId] === X;
-      const count = on.length + (youIn ? 1 : 0);
-      const others = on.filter((k) => k.id !== botId).sort((a, b) => s.trust[botId][b.id] - s.trust[botId][a.id]).map((k) => k.name);
-      const crew = [...others.slice(0, 2), ...(meIn ? ['me'] : [])];
+      let others = on.filter((k) => k.id !== botId).sort((a, b) => s.trust[botId][b.id] - s.trust[botId][a.id]).map((k) => k.name);
+      if (!honest) {
+        // A bluffer still answers the question: it names names, padding the list with people who aren't really in.
+        meIn = true;
+        const padding = shuffle(aliveBots().filter((k) => k.id !== X && k.id !== botId && s.plan[k.id] !== X)).map((k) => k.name);
+        const want = Math.max(1, need - 1 - (youIn ? 1 : 0) - others.length);
+        others = [...others, ...padding.slice(0, Math.min(2, want))];
+      } else if (!meIn) {
+        const now = plan != null && plan !== H && plan !== X ? ` Right now I’m leaning ${nm(plan)}. ${reasonsAgainst(botId, plan)[0].text}` : ' Give me a minute.';
+        return { text: `Honestly? I’m not even sure I’m on ${nm(X)} anymore.${now}` };
+      }
+      const count = others.length + 1 + (youIn ? 1 : 0);
+      const crew = [...others.slice(0, 2), 'me'];
       const extra = others.length > 2 ? ` and ${others.length - 2} more` : '';
       const list = (crew.length > 1 ? (extra ? crew.join(', ') : `${crew.slice(0, -1).join(', ')} and ${crew.at(-1)}`) : crew[0]) + extra;
       const join = youIn ? undefined : [
         { label: 'Count me in', fx: () => { backingVote(botId, X); return count + 1 >= need ? `Then it’s done. ${nm(X)} goes tonight.` : 'Good. That helps. Keep it quiet.'; } },
         { label: 'Not yet', fx: () => 'Okay. Don’t wait too long.' },
       ];
-      if (!honest) {
-        if (!meIn) return { text: fresh(botId, [`${nm(X)}? We’re getting there.`, 'Working on it. Let me talk to a couple people.', 'Close. Give me until tonight.']), options: join };
-        return { text: fresh(botId, [`It’s handled. ${nm(X)} won’t see it coming.`, 'We’re good. Trust me on the numbers.', 'Enough. I’m not saying who, but enough.', `Don’t worry about ${nm(X)}. Worry about keeping it quiet.`]), options: join };
-      }
-      if (!meIn) return { text: `Honestly? I’m not even sure I’m on ${nm(X)} anymore. Give me a minute.` };
-      // Past here this bot really is on X, so `crew` always ends with 'me'.
       const we = crew.length === 1 ? 'I’m' : `${list[0].toUpperCase()}${list.slice(1)} are`;
       const plusYou = youIn ? ', plus you' : '';
       if (count >= need) return { text: `Yeah. ${we} on ${nm(X)}${plusYou}. That’s enough.`, options: join };

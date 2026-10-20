@@ -10,7 +10,7 @@ import { CHALLENGES, byId, runChallenge, simulateChallenge } from './challenges/
 import { runCamp, simulateCamp, hideIdolIfNeeded } from './camp.js';
 import { runTribal, simulateTribal } from './tribal.js';
 import { finalTribal } from './finale.js';
-import { llm, loadLLM, llmEnabled, llmChoice, setLlmChoice, MODELS } from './llm.js';
+import { llm, loadLLM, MODELS } from './llm.js';
 
 const DEFAULTS = { name: '', castSize: 8, difficulty: 'normal', campTimer: 0, look: randomLook('m') };
 let settings = { ...DEFAULTS, ...store.get('ic_settings2', {}) };
@@ -113,22 +113,18 @@ function setupScreen() {
     render();
     return wrap;
   };
-  const aiSeg = h('div', { class: 'seg' });
+  // Castaway chat always uses Island AI; start loading it now so it's ready by camp.
   const aiNote = h('div', { class: 'muted', style: { fontSize: '12px' } });
   const paintAi = () => {
-    const c = llmChoice();
-    const opt = (v, lab) => h('button', { class: c === v ? 'on' : '', onclick: () => { setLlmChoice(v); sfx('click'); if (v !== 'off') loadLLM(); paintAi(); } }, lab);
-    aiSeg.replaceChildren(opt('off', 'Classic'), opt('tuned', `Island AI · ${MODELS.tuned.size}`), opt('light', `Light AI · ${MODELS.light.size}`), opt('best', `Best AI · ${MODELS.best.size}`));
-    const m = MODELS[c];
-    aiNote.textContent = c === 'off' ? 'Castaways answer from the game\u2019s rules engine.'
-      : llm.model === c && llm.status === 'ready' ? `AI ready on your ${llm.device === 'webgpu' ? 'GPU' : 'CPU'}. Small talk is written live on your device; strategy replies still follow the rules engine.`
-      : llm.model === c && llm.status === 'loading' ? `${m.local ? 'Loading' : 'Downloading once'} (${m.size})... ${Math.round(llm.progress * 100)}%`
-      : llm.model === c && llm.status === 'error' ? 'This model couldn\u2019t load on this device. Classic chat will be used.'
-      : m.local ? 'Trained on island camp talk and bundled with the game. Runs fully on your device, no internet needed.'
-      : `Runs fully on your device after a one-time ${m.size} download. No internet needed afterwards.`;
+    const m = MODELS.tuned;
+    aiNote.textContent = llm.status === 'ready' ? `Island AI is ready on your ${llm.device === 'webgpu' ? 'GPU' : 'CPU'}. Small talk is written live on your device; strategy follows each castaway’s real plan.`
+      : llm.status === 'loading' ? `Loading Island AI (${m.size})... ${Math.round(llm.progress * 100)}%`
+      : llm.status === 'error' ? 'Island AI couldn’t load on this device, so castaways will use scripted small talk.'
+      : 'Island AI: castaways chat with an on-device model trained on camp talk. No internet needed.';
   };
   llm.listeners.add(() => { if (aiNote.isConnected) paintAi(); });
   paintAi();
+  loadLLM();
   const nameIn = h('input', { class: 'name-in', placeholder: 'Your castaway name', maxlength: 12, value: settings.name || '' });
   show(h('div', { class: 'screen setup' },
     h('div', { class: 'eyebrow' }, 'NEW SEASON'),
@@ -145,7 +141,7 @@ function setupScreen() {
       h('div', { class: 'opt-lab' }, 'Castaways'), seg('castSize', [[6, '6 · ~20 min'], [8, '8 · ~30 min'], [10, '10 · ~40 min']]),
       h('div', { class: 'opt-lab' }, 'Challenge difficulty'), seg('difficulty', [['easy', 'Easy'], ['normal', 'Normal'], ['hard', 'Hard']]),
       h('div', { class: 'opt-lab' }, 'Camp time limit'), seg('campTimer', [[0, 'None'], [120, '2 min'], [180, '3 min']]),
-      h('div', { class: 'opt-lab' }, 'Castaway chat'), aiSeg, aiNote),
+      h('div', { class: 'opt-lab' }, 'Castaway chat'), aiNote),
     h('div', { class: 'row' },
       h('button', { class: 'btn btn-ghost', onclick: () => { sfx('click'); saveSettings(); titleScreen(); } }, 'Back'),
       h('button', { class: 'btn btn-big grow', onclick: () => {
@@ -213,7 +209,7 @@ function nextChallenge(final) {
 
 async function playSeason() {
   const S = newSeason({ ...settings, look: { ...settings.look }, job: pick(PLAYER_JOBS) });
-  if (llmEnabled()) loadLLM();
+  loadLLM();
   setPausable(true);
   challengeBag = [];
   await castReveal();
