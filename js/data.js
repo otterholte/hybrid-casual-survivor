@@ -36,6 +36,7 @@ export const PLAYER_JOBS = ['Mystery castaway', 'Superfan', 'Student', 'Designer
 // Presets the human can send at camp. `needs: 'target'` asks for a name.
 export const PRESETS = [
   { id: 'who', text: 'Who are you thinking of voting for?' },
+  { id: 'numbers', text: 'Do you have the votes?' },
   { id: 'ally', text: 'Want to work together?' },
   { id: 'voteout', text: 'I think we should vote out {X}.', needs: 'target' },
   { id: 'trust', text: 'Can I trust you?' },

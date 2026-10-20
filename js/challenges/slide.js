@@ -52,6 +52,8 @@ export default {
   how: 'The tiki sun has been scrambled! <b>Tap a tile</b> in the same row or column as the gap to slide it. Rebuild the picture to win.',
   goal: (d) => (d === 'hard' ? 15 : 8),
   expected: (d) => ({ easy: 28, normal: 50, hard: 75 })[d],
+  // Seconds the best bot takes (race) or lasts (endurance); see botResults.
+  firstPlace: { easy: [30, 38], normal: [40, 50], hard: [70, 90] },
   unit: 'tiles',
   create(api) {
     const { W, H, diff } = api;

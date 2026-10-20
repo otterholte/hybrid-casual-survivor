@@ -118,12 +118,13 @@ function setupScreen() {
   const paintAi = () => {
     const c = llmChoice();
     const opt = (v, lab) => h('button', { class: c === v ? 'on' : '', onclick: () => { setLlmChoice(v); sfx('click'); if (v !== 'off') loadLLM(); paintAi(); } }, lab);
-    aiSeg.replaceChildren(opt('off', 'Classic'), opt('light', `Light AI · ${MODELS.light.size}`), opt('best', `Best AI · ${MODELS.best.size}`));
+    aiSeg.replaceChildren(opt('off', 'Classic'), opt('tuned', `Island AI · ${MODELS.tuned.size}`), opt('light', `Light AI · ${MODELS.light.size}`), opt('best', `Best AI · ${MODELS.best.size}`));
     const m = MODELS[c];
     aiNote.textContent = c === 'off' ? 'Castaways answer from the game\u2019s rules engine.'
       : llm.model === c && llm.status === 'ready' ? `AI ready on your ${llm.device === 'webgpu' ? 'GPU' : 'CPU'}. Small talk is written live on your device; strategy replies still follow the rules engine.`
-      : llm.model === c && llm.status === 'loading' ? `Downloading once (${m.size})... ${Math.round(llm.progress * 100)}%`
+      : llm.model === c && llm.status === 'loading' ? `${m.local ? 'Loading' : 'Downloading once'} (${m.size})... ${Math.round(llm.progress * 100)}%`
       : llm.model === c && llm.status === 'error' ? 'This model couldn\u2019t load on this device. Classic chat will be used.'
+      : m.local ? 'Trained on island camp talk and bundled with the game. Runs fully on your device, no internet needed.'
       : `Runs fully on your device after a one-time ${m.size} download. No internet needed afterwards.`;
   };
   llm.listeners.add(() => { if (aiNote.isConnected) paintAi(); });

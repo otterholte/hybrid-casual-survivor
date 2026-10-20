@@ -17,6 +17,8 @@ export default {
   how: 'Use the <b>control pad</b> under the disc to tilt it: push the knob the way you want the balls to roll. Wind and wobble push them around, and a new ball lands every few seconds. <b>Lose one and you\'re out!</b>',
   goal: () => 0,
   expected: (d) => ({ easy: 70, normal: 55, hard: 45 })[d],
+  // Seconds the best bot takes (race) or lasts (endurance); see botResults.
+  firstPlace: { easy: [26, 32], normal: [28, 35], hard: [30, 38] },
   unit: 'balls',
   create(api) {
     const { W, H, diff } = api;

@@ -1,6 +1,8 @@
 // Bot brains: vote planning, conversation replies, gossip, idols and jury votes.
 import { game, P, nm, alive, aliveBots, adjTrust } from './state.js';
 import { rand, pick, chance, clamp, shuffle, weightedPick } from './util.js';
+import { mind, note, facts, thisRound, fresh, markAsked, wasAsked, reasonsAgainst, memoryScore, humanSaidVote, lastVotes, pronoun, gossipAboutHuman, warnBot } from './mind.js';
+import { chatReply, followUps } from './chat.js';
 
 const S = () => game.S;
 const H = 0; // human id
@@ -31,6 +33,7 @@ export function rawScore(b, c) {
     - s.idolSusp[c] * 0.35 * bt.strategic
     + s.influence[b][c]
     - (s.allied[b][c] ? 0.8 * bt.loyal : 0)
+    + memoryScore(b, c)
     + s.noise[b][c];
 }
 
@@ -109,8 +112,9 @@ function askedWho(botId, exclude = []) {
 function namedTarget(botId, X, lead) {
   const s = S();
   s.botTold[botId] = X;
+  const why = X !== H ? reasonsAgainst(botId, X)[0] : null;
   return {
-    text: `${lead} ${nm(X)}. You good with that?`,
+    text: `${lead} ${nm(X)}.${why && why.w > 0.25 ? ` ${why.text}` : ''} You good with that?`,
     options: [
       { label: 'Yes, I’m in', fx: () => { backingVote(botId, X); return pick(['Good. Keep it quiet.', 'Perfect. We’re locked in.']); } },
       { label: 'Maybe', fx: () => 'Okay. Don’t wait too long to decide.' },
@@ -130,6 +134,12 @@ export function replyTo(botId, presetId, target, freeText) {
   switch (presetId) {
     case 'who': {
       const honest = tr + bt.honesty * 0.5 > 0.45;
+      // Already gave you a name this round: stick to it, or say plainly that it changed.
+      const told = s.botTold[botId];
+      if (told != null && told !== H && P(told).alive && !P(told).immune) {
+        if (plan === told || !honest) return { text: `${fresh(botId, ['Like I said,', 'Same as before:', 'Still'])} ${nm(told)}. ${reasonsAgainst(botId, told)[0].text}` };
+        if (plan != null && plan !== H) { s.botTold[botId] = plan; return { text: `Change of plan. I’m on ${nm(plan)} now. ${reasonsAgainst(botId, plan)[0].text}` }; }
+      }
       if (plan === H) {
         if (bt.honesty > 0.85 && tr > 0.3) {
           return {
@@ -198,6 +208,42 @@ export function replyTo(botId, presetId, target, freeText) {
         ],
       };
     }
+    case 'numbers': {
+      // "Do you have the votes?" answered from real plans: who is actually on the name this bot is pushing.
+      const honest = tr + bt.honesty * 0.5 > 0.45;
+      let X = target ?? s.botTold[botId] ?? plan;
+      if (X === botId) return { text: pick(['For me? I really hope nobody has those.', 'If someone has the votes for me, nobody told me.']) };
+      if (X === H) { // they're coming for you; never admit it unless very honest and fond of you
+        if (bt.honesty > 0.85 && tr > 0.3) return { text: 'Honestly? The numbers I’m hearing are on you. I don’t like it either.' };
+        X = pick(candidates(botId, [H])) ?? null;
+        if (X != null) s.botTold[botId] = X;
+      }
+      if (X == null) return { text: 'Not yet. Nobody’s locked in on anything. Who are you thinking?', options: askedWho(botId) };
+      const need = Math.floor(alive().length / 2) + 1;
+      const on = aliveBots().filter((k) => k.id !== X && s.plan[k.id] === X);
+      const meIn = on.some((k) => k.id === botId);
+      const youIn = s.promises[botId] === X;
+      const count = on.length + (youIn ? 1 : 0);
+      const others = on.filter((k) => k.id !== botId).sort((a, b) => s.trust[botId][b.id] - s.trust[botId][a.id]).map((k) => k.name);
+      const crew = [...others.slice(0, 2), ...(meIn ? ['me'] : [])];
+      const extra = others.length > 2 ? ` and ${others.length - 2} more` : '';
+      const list = (crew.length > 1 ? (extra ? crew.join(', ') : `${crew.slice(0, -1).join(', ')} and ${crew.at(-1)}`) : crew[0]) + extra;
+      const join = youIn ? undefined : [
+        { label: 'Count me in', fx: () => { backingVote(botId, X); return count + 1 >= need ? `Then it’s done. ${nm(X)} goes tonight.` : 'Good. That helps. Keep it quiet.'; } },
+        { label: 'Not yet', fx: () => 'Okay. Don’t wait too long.' },
+      ];
+      if (!honest) {
+        if (!meIn) return { text: fresh(botId, [`${nm(X)}? We’re getting there.`, 'Working on it. Let me talk to a couple people.', 'Close. Give me until tonight.']), options: join };
+        return { text: fresh(botId, [`It’s handled. ${nm(X)} won’t see it coming.`, 'We’re good. Trust me on the numbers.', 'Enough. I’m not saying who, but enough.', `Don’t worry about ${nm(X)}. Worry about keeping it quiet.`]), options: join };
+      }
+      if (!meIn) return { text: `Honestly? I’m not even sure I’m on ${nm(X)} anymore. Give me a minute.` };
+      // Past here this bot really is on X, so `crew` always ends with 'me'.
+      const we = crew.length === 1 ? 'I’m' : `${list[0].toUpperCase()}${list.slice(1)} are`;
+      const plusYou = youIn ? ', plus you' : '';
+      if (count >= need) return { text: `Yeah. ${we} on ${nm(X)}${plusYou}. That’s enough.`, options: join };
+      if (!youIn && count + 1 >= need) return { text: `Close. ${we} on ${nm(X)}. With you, it’s done.`, options: join };
+      return { text: `Not yet. ${crew.length === 1 ? 'So far it’s just me' : we} on ${nm(X)}${plusYou}. We need ${need - count} more.`, options: join };
+    }
     case 'trust': {
       adjTrust(botId, H, 0.04);
       if (tr > 0.35) return { text: pick(['100%. I’ve got your back.', 'Absolutely. You’re one of my people.']) };
@@ -253,58 +299,134 @@ function freeReply(botId, text) {
   return { text: pick(['Ha, yeah.', 'Totally. It’s brutal out here.', 'I hear you.', 'Mm-hm. Interesting.']) };
 }
 
-// Bots reaching out to the human on their own.
+// Bots reaching out to the human on their own. Each bot picks the most pressing thing it has to
+// say given everything it knows, and never raises the same thing twice in a round (final-two
+// offers: once a season).
 export function botOpener(botId) {
-  const s = S(), tr = s.trust[botId][H], plan = s.plan[botId];
-  const enemies = aliveBots().filter((k) => k.id !== botId && s.plan[k.id] === H);
-  if (enemies.length && tr > 0.25 && P(botId).t.honesty > 0.4 && chance(0.6)) {
-    const k = pick(enemies).id;
-    return {
-      text: `Heads up... ${nm(k)} has been saying your name.`,
-      options: [
-        { label: 'Thanks for the heads up', fx: () => { adjTrust(botId, H, 0.08); return 'Anytime. We look out for each other.'; } },
-        { label: `Let's flip it on ${nm(k)}`, fx: () => { s.influence[botId][k] += 0.5; s.promises[botId] = k; computePlans(); return `I like it. ${nm(k)} won't see it coming.`; } },
-      ],
-    };
-  }
-  if (tr > 0.25 && !s.allied[botId][H] && chance(0.35)) {
-    return {
-      text: 'I feel like you and I could go far together. Final two deal?',
-      options: [
-        { label: 'Deal 🤝', fx: () => { s.allied[botId][H] = s.allied[H][botId] = true; adjTrust(botId, H, 0.2); return "Let's do this. Nobody knows."; } },
-        { label: "Let's see", fx: () => { adjTrust(botId, H, -0.03); return 'Fair. The offer stands.'; } },
-      ],
-    };
-  }
-  if (plan != null && tr > -0.1 && chance(0.6)) {
-    const named = plan === H ? pick(candidates(botId, [H])) ?? plan : plan;
-    s.botTold[botId] = named;
-    return {
-      text: `Hey ${nm(H)}. I'm thinking ${nm(named)} tonight. You in?`,
-      options: [
-        { label: "I'm in", fx: () => { s.promises[botId] = named; adjTrust(botId, H, 0.12); s.influence[botId][named] += 0.2; computePlans(); return 'Perfect. Keep it between us.'; } },
-        { label: 'Not sure yet', fx: () => 'Okay. Let me know before tribal.' },
-        { label: 'No way', fx: () => { adjTrust(botId, H, -0.1); s.influence[botId][H] += 0.12; computePlans(); return 'Huh. Okay then.'; } },
-      ],
-    };
-  }
-  const opts = shuffle(candidates(botId, [H])).slice(0, 3);
-  return {
-    text: 'So... who are you voting for tonight?',
+  const s = S(), b = P(botId), tr = s.trust[botId][H], plan = s.plan[botId];
+  const honest = tr + b.t.honesty * 0.5 > 0.45;
+  const mySaid = humanSaidVote(botId);
+  const ask = (label) => ({ label, fx: () => chatReply(botId, label, s.threads?.[botId]) });
+  const C = []; // candidate openers: { key, score, season?, make() }
+  const add = (key, score, make, season = false) => { if (score > 0 && !wasAsked(botId, key, season)) C.push({ key, score: score + rand(0, 0.4), make, season }); };
+
+  // You told two people two different names, and it got back to this bot.
+  const caught = facts(botId, (f) => thisRound(f) && f.kind === 'both_sides').at(-1);
+  if (caught && mySaid != null) add('confront', 3.2, () => ({
+    text: `${nm(caught.src)} says you told ${pronoun(caught.src, 'obj')} ${nm(caught.target)}. You told me ${nm(mySaid)}. So which is it?`,
+    options: [ask(`I'm in on ${nm(mySaid)}`), ask(`I'm in on ${nm(caught.target)}`), { label: `${nm(caught.src)} is lying`, fx: () => {
+      const believe = tr > s.trust[botId][caught.src];
+      adjTrust(botId, caught.src, believe ? -0.15 : 0); adjTrust(botId, H, believe ? 0.05 : -0.1);
+      return believe ? `Okay. I believe you. But ${nm(caught.src)} and I are going to have a talk.` : 'Hm. That’s exactly what someone playing both sides would say.';
+    } }],
+  }));
+
+  // You broke your word to this bot at the last Tribal.
+  const broke = facts(botId, (f) => f.kind === 'lied_to_me' && f.about === H && f.r === s.round - 1).at(-1);
+  if (broke) add(`broke${s.round}`, 2.9, () => ({
+    text: `You told me ${nm(broke.target)} and wrote ${broke.actual === botId ? 'MY name' : nm(broke.actual)}. Why should I believe anything you say now?`,
     options: [
-      ...opts.map((c) => ({
-        label: nm(c),
-        fx: () => {
-          s.promises[botId] = c;
-          if (s.plan[botId] === c) { adjTrust(botId, H, 0.1); return 'Same. Good.'; }
-          if (s.allied[botId][c]) { adjTrust(botId, H, -0.2); return `${nm(c)}? Oh. Okay.`; }
-          s.influence[botId][c] += 0.15; computePlans();
-          return 'Interesting. I could get there.';
-        },
-      })),
-      { label: 'Not sure', fx: () => { adjTrust(botId, H, -0.03); return 'Mm. Keep me posted.'; } },
+      { label: 'It was a numbers thing', fx: () => { adjTrust(botId, H, b.t.strategic > 0.6 ? 0.06 : 0.01); return b.t.strategic > 0.6 ? 'Fine. I get numbers. But you owe me one.' : 'Numbers. Sure.'; } },
+      { label: 'I’m sorry. I’m with you now', fx: () => { adjTrust(botId, H, b.t.loyal > 0.6 ? 0.08 : 0.02); return 'Then prove it tonight.'; } },
+      ask('Who are you thinking tonight?'),
     ],
-  };
+  }), true);
+
+  // Someone is coming for you and this bot likes you enough to say so.
+  const enemies = aliveBots().filter((k) => k.id !== botId && s.plan[k.id] === H);
+  if (enemies.length && tr > 0.2 && b.t.honesty > 0.35) {
+    const k = enemies.sort((x, y) => s.trust[botId][x.id] - s.trust[botId][y.id])[0];
+    add('warn', 2.2 + tr, () => {
+      const why = reasonsAgainst(k.id, H)[0].text;
+      return {
+        text: `Heads up. ${k.name} is pushing your name. ${/^Honestly/.test(why) ? '' : `The pitch is basically: “${why}”`}`.trim(),
+        options: [
+          { label: 'Thanks for the heads up', fx: () => { adjTrust(botId, H, 0.08); return 'Anytime. We look out for each other.'; } },
+          ask(`Let's vote ${k.name} out`),
+          ask('Who else is on board?'),
+        ],
+      };
+    });
+  }
+
+  // Pitch the bot's real target (or, if it's you, a cover name) with its actual reason.
+  if (plan != null) {
+    const target = plan === H ? (honest && b.t.honesty > 0.85 ? null : candidates(botId, [H]).sort((x, y) => rawScore(botId, y) - rawScore(botId, x))[0]) : plan;
+    if (target != null && mySaid !== target) add(`pitch:${target}`, 1.8 + b.t.strategic * 0.6, () => {
+      s.botTold[botId] = target;
+      const why = reasonsAgainst(botId, target)[0].text;
+      return {
+        text: `${fresh(botId, [`I want ${nm(target)} out tonight.`, `I think it’s time ${nm(target)} goes.`, `Tonight I want ${nm(target)} gone.`, `It has to be ${nm(target)} tonight.`])} ${why} You in?`,
+        options: [ask(`I'm in on ${nm(target)}`), ask('Who else is on board?'), ask(`I'd rather keep ${nm(target)}`)],
+      };
+    });
+  }
+
+  // You already said who you're voting; check you're still good, with the real numbers.
+  if (mySaid != null && P(mySaid).alive && plan === mySaid) add(`check:${mySaid}`, 1.3, () => {
+    const with_ = aliveBots().filter((k) => k.id !== botId && k.id !== mySaid && s.plan[k.id] === mySaid).map((k) => k.name);
+    return {
+      text: `Still good on ${nm(mySaid)}? ${with_.length && honest ? `${with_.slice(0, 2).join(' and ')} ${with_.length > 1 ? 'are' : 'is'} with us.` : 'I’m still working on a couple people.'}`,
+      options: [ask(`I'm still in on ${nm(mySaid)}`), ask('Who else is on board?'), ask(`Why ${nm(mySaid)}?`)],
+    };
+  });
+
+  // Pass on something it heard from another castaway.
+  const heard = facts(botId, (f) => thisRound(f) && f.kind === 'b_pitch' && f.src !== H && P(f.src).alive && f.target !== botId);
+  if (heard.length && (honest || b.t.social > 0.7)) {
+    const f = heard.at(-1);
+    add(`intel:${f.src}:${f.target}`, f.target === H ? 2.4 : 1.4, () => ({
+      text: f.target === H ? `Thought you should know. ${nm(f.src)} pulled me aside and said your name.` : `Thought you should know: ${nm(f.src)} told me ${pronoun(f.src)} wants ${nm(f.target)} out.`,
+      options: f.target === H ? [ask(`Let's vote ${nm(f.src)} out`), ask('Who else is on board?'), { label: 'Thank you', fx: () => { adjTrust(botId, H, 0.05); return 'Of course. Watch your back.'; } }]
+        : [ask(`What do you think of ${nm(f.src)}?`), ask(`Let's vote ${nm(f.target)} out`), ask(`I'd rather keep ${nm(f.target)}`)],
+    }));
+  }
+
+  // Final two: once a season, only when the bot genuinely trusts you.
+  if (!s.allied[botId][H] && tr > 0.28 && alive().length > 3) add('f2', 1.2 + tr, () => {
+    const kept = facts(botId, (f) => f.kind === 'h_kept').length;
+    return {
+      text: `${kept ? 'You’ve kept your word with me. ' : ''}I feel like you and I could go far together. Final two deal?`,
+      options: [
+        { label: 'Deal 🤝', fx: () => { s.allied[botId][H] = s.allied[H][botId] = true; adjTrust(botId, H, 0.2); return 'Let’s do this. Nobody knows.'; } },
+        { label: 'Let’s see how tonight goes', fx: () => { adjTrust(botId, H, -0.02); return 'Fair. The offer stands.'; } },
+        ask('Who are you thinking tonight?'),
+      ],
+    };
+  }, true);
+
+  // How you voted last time, from this bot's side of the board.
+  const lv = lastVotes();
+  if (lv && lv.votes[H] != null && lv.votes[botId] != null && s.round > 1) {
+    const same = lv.votes[H] === lv.votes[botId];
+    add(`lastvote${s.round}`, same ? 0.9 : 1.6, () => same
+      ? { text: `We were together on ${nm(lv.votes[H])} last night. I want to keep that going.`, options: [ask('Who are you thinking tonight?'), ask('Can I trust you?'), ask('Want to work together?')] }
+      : { text: `You wrote ${lv.votes[H] === botId ? 'MY name' : nm(lv.votes[H])} last night. I was on ${nm(lv.votes[botId])}. What happened?`, options: [
+        { label: 'I didn’t know the plan', fx: () => { adjTrust(botId, H, 0.04); return 'Then talk to me first next time.'; } },
+        { label: 'I had my reasons', fx: () => { adjTrust(botId, H, -0.04); return 'Okay. I’ll remember that.'; } },
+        ask('Who are you thinking tonight?'),
+      ] }, false);
+  }
+
+  // You won immunity.
+  if (s.lastWinner === H) add('react_win', 1.0, () => ({
+    text: fresh(botId, ['Congrats on the necklace. Enjoy it, because the second you lose it everyone’s coming.', 'Nice win. You know that makes you a target next time, right?']),
+    options: [ask('Can I trust you?'), ask('Who are you thinking tonight?'), ask('What have you heard?')],
+  }));
+
+  // Nothing pressing: ask where you stand (once a round).
+  if (mySaid == null) add('ask_plan', 0.8, () => {
+    const opts = shuffle(candidates(botId, [H])).slice(0, 3);
+    return {
+      text: fresh(botId, ['So... who are you thinking tonight?', 'Okay, I need to know. Where’s your vote going?']),
+      options: [...opts.map((c) => ask(`I'm voting ${nm(c)}`)), { label: 'Not sure', fx: () => { adjTrust(botId, H, -0.03); return 'Mm. Keep me posted.'; } }],
+    };
+  });
+
+  if (!C.length) return { text: fresh(botId, ['Hey. Got a minute? I want to compare notes.', 'Come find me before Tribal, okay?']), options: followUps(botId, { text: '' }, {}) };
+  const pickC = C.sort((x, y) => y.score - x.score)[0];
+  markAsked(botId, pickC.key);
+  return pickC.make();
 }
 
 // ------------------------------------------------------------------
@@ -326,6 +448,17 @@ export function botConvo(forceWith) {
   const m = (from, to, text) => msgs.push({ from: from.id, to: to.id, text });
   const pa = s.plan[a.id], pb = s.plan[b.id];
 
+  // Gossip first: what the human has been saying travels.
+  const g = chance(0.45) ? gossipAboutHuman(a.id, b.id) : null;
+  const w = !g && chance(0.25) ? warnBot(a.id, b.id) : null;
+  if (g || w) {
+    const [x, y] = g || w;
+    m(a, b, x);
+    m(b, a, y);
+    computePlans();
+    return msgs;
+  }
+
   const leakIdx = s.leaks.findIndex((l) => l.from === a.id);
   if (leakIdx >= 0) {
     s.leaks.splice(leakIdx, 1);
@@ -334,8 +467,11 @@ export function botConvo(forceWith) {
     s.influence[b.id][H] -= 0.4;
     s.idolSusp[H] = clamp(s.idolSusp[H] + 0.15, 0, 1);
   } else if (pa != null && pa !== b.id) {
-    m(a, b, pick([`I'm thinking ${nm(pa)} tonight.`, `${nm(pa)} has to go. Are you with me?`, `We need to talk about ${nm(pa)}.`, `What do you think about ${nm(pa)}?`]));
-    if (pb === pa) m(b, a, pick([`Same. ${nm(pa)} is done.`, `100%. I was going to say the same.`, `Yes. Let's lock it in.`]));
+    const why = reasonsAgainst(a.id, pa)[0];
+    m(a, b, `${pick([`I'm thinking ${nm(pa)} tonight.`, `${nm(pa)} has to go. Are you with me?`, `We need to talk about ${nm(pa)}.`])}${why.w > 0.3 && pa !== H ? ` ${why.text}` : ''}`);
+    note(b.id, { src: a.id, kind: 'b_pitch', about: a.id, target: pa });
+    if (pa === b.id) note(b.id, { src: a.id, kind: 'targeting_me', about: a.id });
+    if (pb === pa) { m(b, a, pick([`Same. ${nm(pa)} is done.`, `100%. I was going to say the same.`, `Yes. Let's lock it in.`])); note(a.id, { src: b.id, kind: 'b_pitch', about: b.id, target: pa }); }
     else if (s.allied[b.id][pa] || s.trust[b.id][pa] > 0.45) {
       m(b, a, `${nm(pa)}? No... I need ${nm(pa)}.`);
       if (pb != null && pb !== a.id) m(b, a, `What about ${nm(pb)} instead?`);
@@ -352,7 +488,7 @@ export function botConvo(forceWith) {
       m(a, b, `Have you seen ${nm(idolGuy)} sneaking off? Idol hunting for sure.`);
       m(b, a, pick(['Ugh. We might need to split the vote.', 'Yeah, I noticed. Suspicious.']));
     } else if (winner != null && P(winner).alive && winner !== a.id && winner !== b.id) {
-      m(a, b, `${nm(winner)} keeps winning. We have to get them out the second they lose.`);
+      m(a, b, `${nm(winner)} keeps winning. We have to get ${pronoun(winner, 'obj')} out the second ${pronoun(winner)} loses.`.replace('get you out the second you loses', 'get them out the second they lose'));
       m(b, a, pick(['Agreed. Big threat.', 'Maybe... but they help us in challenges.']));
       s.threat[winner] += 0.03;
     } else {
@@ -550,7 +686,17 @@ export function learnFromVote(votes, outId) {
     if (hv !== promised && chance(0.75)) {
       adjTrust(id, H, -0.35);
       s.players[H].stats.betrayals++;
-    } else if (hv === promised) adjTrust(id, H, 0.08);
+      note(id, { src: H, kind: 'lied_to_me', about: H, target: promised, actual: hv });
+    } else if (hv === promised) { adjTrust(id, H, 0.08); note(id, { src: H, kind: 'h_kept', about: H, target: hv }); }
+  }
+  // Bots remember who pitched them one name and then wrote another (or wrote theirs).
+  for (const b of aliveBots()) {
+    for (const f of facts(b.id, (x) => thisRound(x) && x.kind === 'b_pitch' && x.src !== H)) {
+      const actual = votes[f.src];
+      if (actual == null || actual === f.target) continue;
+      if (actual === b.id) { note(b.id, { src: f.src, kind: 'lied_to_me', about: f.src, target: f.target, actual }); adjTrust(b.id, f.src, -0.25); }
+      else adjTrust(b.id, f.src, -0.06);
+    }
   }
   for (const [v, t] of Object.entries(votes)) {
     if (!/^\d+$/.test(v)) continue; // extra votes are keyed x<id>

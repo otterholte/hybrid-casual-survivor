@@ -1,0 +1,6 @@
+.venv/
+.venv-export/
+out/
+compare/node_modules/
+__pycache__/
+*.log

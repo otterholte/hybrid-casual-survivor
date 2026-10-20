@@ -19,12 +19,21 @@ const MULT = { race: { easy: 1.45, normal: 1.1, hard: 0.92 }, endurance: { easy:
 /** Sample how each bot does. Race: finish time. Endurance: time they drop out. */
 export function botResults(ch, bots, diff, final = false) {
   const E = ch.expected(diff);
-  return bots.map((b) => {
+  const race = ch.mode === 'race';
+  const boost = final ? 0.95 : 1;
+  const res = bots.map((b) => {
     const sk = b.t[ch.skill] ?? 0.5;
-    const boost = final ? 0.95 : 1;
-    if (ch.mode === 'race') return { id: b.id, time: E * MULT.race[diff] * boost * (1.45 - sk * 0.75) * rand(0.8, 1.25) };
+    if (race) return { id: b.id, time: E * MULT.race[diff] * boost * (1.45 - sk * 0.75) * rand(0.8, 1.25) };
     return { id: b.id, time: E * MULT.endurance[diff] / boost * (0.55 + sk * 0.8) * rand(0.75, 1.3) };
   });
+  // Pin the winner's time to the tuned window, keeping every bot's gap to the winner.
+  const win = ch.firstPlace?.[diff];
+  if (win && res.length) {
+    const best = race ? Math.min(...res.map((r) => r.time)) : Math.max(...res.map((r) => r.time));
+    const goal = rand(win[0], win[1]) * (race ? boost : 1 / boost);
+    for (const r of res) r.time *= goal / best;
+  }
+  return res;
 }
 
 /** For seasons where the human is on the jury: resolve a challenge instantly. */

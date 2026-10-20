@@ -1,7 +1,7 @@
 // Back at Camp: talk to anyone (or a group) as much as you like, plus ONE excursion per day (spy or idol search).
 import { game, P, nm, alive, aliveBots, human, adjTrust } from './state.js';
 import { replyTo, botOpener, botConvo, computePlans, spendAdv } from './ai.js';
-import { chatReply, understand, matchOption, FLAVOR_INTENTS, GROUP_PRESETS, groupReply } from './chat.js';
+import { chatReply, understand, matchOption, isGameTalk, FLAVOR_INTENTS, GROUP_PRESETS, groupReply } from './chat.js';
 import { llm, chatter } from './llm.js';
 import { PRESETS, ZONES, ADVANTAGES } from './data.js';
 import { h, rand, pick, chance, sleep, weightedPick, shuffle, clock } from './util.js';
@@ -359,7 +359,10 @@ export function runCamp() {
               target = await pickName(p.text, aliveBots().filter((x) => x.id !== botId).map((x) => x.id));
               if (target == null) return;
             }
-            send(p.text.replace('{X}', target != null ? nm(target) : ''), () => replyTo(botId, p.id, target));
+            {
+              const msg = p.text.replace('{X}', target != null ? nm(target) : '');
+              send(msg, () => chatReply(botId, msg, thread));
+            }
           },
         }, p.text.replace('{X}', '___')))));
         form.style.display = out ? 'none' : '';
@@ -403,12 +406,13 @@ export function runCamp() {
           return;
         }
         send(text, async () => {
-          const { intent } = understand(text, botId);
-          const rule = chatReply(botId, text);
-          if (FLAVOR_INTENTS.has(intent) && llm.status === 'ready') {
+          const { intent } = understand(text, botId, thread);
+          const rule = chatReply(botId, text, thread);
+          // The model only does small talk; anything about the vote stays with the rules engine.
+          if (FLAVOR_INTENTS.has(intent) && !isGameTalk(text) && llm.status === 'ready') {
             const mood = S.plan[botId] === 0 ? 'Privately you are wary of them.' : S.trust[botId][0] > 0.3 ? 'You like them.' : '';
             const t = await chatter({ bot: b, playerName: me.name, message: text, fallback: rule.text, allNames: S.players.map((p) => p.name), mood });
-            return { text: t, options: t === rule.text ? rule.options : null };
+            return { text: t, options: rule.options };
           }
           return rule;
         });
@@ -463,7 +467,7 @@ export function runCamp() {
         sfx('send');
         busy = true;
         paint();
-        const replies = groupReply(members, presetId, target, text);
+        const replies = groupReply(members, presetId, target, text, g.thread);
         for (const r of replies) {
           await sleep(rand(800, 1400));
           g.thread.push({ from: r.from, text: r.text, day });

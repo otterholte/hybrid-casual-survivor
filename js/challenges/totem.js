@@ -15,6 +15,8 @@ export default {
   how: 'A carved block slides back and forth. <b>Tap</b> to drop it on the totem. Anything hanging over the edge gets chopped off, so line it up! Hit the target height to win.',
   goal: (d) => ({ easy: 8, normal: 12, hard: 15 })[d],
   expected: (d) => ({ easy: 20, normal: 32, hard: 46 })[d],
+  // Seconds the best bot takes (race) or lasts (endurance); see botResults.
+  firstPlace: { easy: [20, 29], normal: [24, 35], hard: [29, 42] },
   unit: 'tiers',
   create(api) {
     const { W, H, diff } = api;

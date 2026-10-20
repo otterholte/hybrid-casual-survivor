@@ -14,6 +14,8 @@ export default {
   how: 'Drag back from the slingshot and release to launch. Land coconuts in the <b>open top</b> of the sack. Fill it until the rope snaps!',
   goal: (d) => ({ easy: 5, normal: 7, hard: 10 })[d],
   expected: (d) => ({ easy: 22, normal: 36, hard: 55 })[d],
+  // Seconds the best bot takes (race) or lasts (endurance); see botResults.
+  firstPlace: { easy: [32, 40], normal: [40, 50], hard: [51, 64] },
   unit: 'coconuts',
   create(api) {
     const { W, H, diff } = api;

@@ -1,0 +1,602 @@
+[
+  {
+    "run": "tuned:q4",
+    "loadMs": 541,
+    "bytes": 86489669,
+    "medianMs": 163,
+    "meanMs": 158,
+    "rejected": 0,
+    "replies": [
+      {
+        "bot": "Zoe",
+        "q": "how are you holding up out here?",
+        "raw": "Honestly pretty good. The ocean makes everything a little better.",
+        "kept": "Honestly pretty good. The ocean makes everything a little better.",
+        "ms": 186
+      },
+      {
+        "bot": "Zoe",
+        "q": "what's the first thing you'll eat when you get home",
+        "raw": "Bread. Just warm bread and butter. I'm not picky anymore.",
+        "kept": "Bread. Just warm bread and butter. I'm not picky anymore.",
+        "ms": 194
+      },
+      {
+        "bot": "Zoe",
+        "q": "that storm last night was wild",
+        "raw": "I'm still damp. I might be damp forever now.",
+        "kept": "I'm still damp. I might be damp forever now.",
+        "ms": 140
+      },
+      {
+        "bot": "Zoe",
+        "q": "do you think the next challenge will be a puzzle?",
+        "raw": "Whatever it is, I'm going all in.",
+        "kept": "Whatever it is, I'm going all in.",
+        "ms": 122
+      },
+      {
+        "bot": "Zoe",
+        "q": "are you nervous about tribal tonight?",
+        "raw": "I always pack my bag before tribal, just in case.",
+        "kept": "I always pack my bag before tribal, just in case.",
+        "ms": 128
+      },
+      {
+        "bot": "Zoe",
+        "q": "who's the most dangerous person here?",
+        "raw": "The one everyone likes. Those are the dangerous ones.",
+        "kept": "The one everyone likes. Those are the dangerous ones.",
+        "ms": 132
+      },
+      {
+        "bot": "Zoe",
+        "q": "what do you think the jury will care about?",
+        "raw": "Be honest about what you did. Juries smell lies from a mile away.",
+        "kept": "Be honest about what you did. Juries smell lies from a mile away.",
+        "ms": 172
+      },
+      {
+        "bot": "Zoe",
+        "q": "i'm bored, entertain me",
+        "raw": "Let's go find a crab and race it. Winner gets nothing.",
+        "kept": "Let's go find a crab and race it. Winner gets nothing.",
+        "ms": 171
+      },
+      {
+        "bot": "Zoe",
+        "q": "be honest, are you a robot?",
+        "raw": "A robot doesn't think like people does, so I'll let that slide.",
+        "kept": "A robot doesn't think like people does, so I'll let that slide.",
+        "ms": 192
+      },
+      {
+        "bot": "Zoe",
+        "q": "what's your favorite thing about the island?",
+        "raw": "The water. Swimming out there is the only time I forget I'm hungry.",
+        "kept": "The water. Swimming out there is the only time I forget I'm hungry.",
+        "ms": 194
+      },
+      {
+        "bot": "Ben",
+        "q": "how are you holding up out here?",
+        "raw": "Honestly pretty good. The ocean makes everything a little better.",
+        "kept": "Honestly pretty good. The ocean makes everything a little better.",
+        "ms": 162
+      },
+      {
+        "bot": "Ben",
+        "q": "what's the first thing you'll eat when you get home",
+        "raw": "Bread again, yeah. I'm starting to see it when I close my ears and mouth.",
+        "kept": "Bread again, yeah. I'm starting to see it when I close my ears and mouth.",
+        "ms": 217
+      },
+      {
+        "bot": "Ben",
+        "q": "that storm last night was wild",
+        "raw": "I'm still shaking. My arms are completely gone.",
+        "kept": "I'm still shaking. My arms are completely gone.",
+        "ms": 122
+      },
+      {
+        "bot": "Ben",
+        "q": "do you think the next challenge will be a puzzle?",
+        "raw": "No idea, but I'll make sure everybody's doing their part.",
+        "kept": "No idea, but I'll make sure everybody's doing their part.",
+        "ms": 163
+      },
+      {
+        "bot": "Ben",
+        "q": "are you nervous about tribal tonight?",
+        "raw": "Nervous enough to be careful who I talk to.",
+        "kept": "Nervous enough to be careful who I talk to.",
+        "ms": 128
+      },
+      {
+        "bot": "Ben",
+        "q": "who's the most dangerous person here?",
+        "raw": "Honestly? Everybody's playing. Some people just hide it better.",
+        "kept": "Honestly? Everybody's playing. Some people just hide it better.",
+        "ms": 158
+      },
+      {
+        "bot": "Ben",
+        "q": "what do you think the jury will care about?",
+        "raw": "Be honest about what you did. Juries smell lies from a mile away.",
+        "kept": "Be honest about what you did. Juries smell lies from a mile away.",
+        "ms": 174
+      },
+      {
+        "bot": "Ben",
+        "q": "i'm bored, entertain me",
+        "raw": "Let's do something fun? I have it organized.",
+        "kept": "Let's do something fun? I have it organized.",
+        "ms": 122
+      },
+      {
+        "bot": "Ben",
+        "q": "be honest, are you a robot?",
+        "raw": "Real enough to be starving. Feel my sunburn if you don't believe me.",
+        "kept": "Real enough to be starving. Feel my sunburn if you don't believe me.",
+        "ms": 170
+      },
+      {
+        "bot": "Ben",
+        "q": "what's your favorite thing about the island?",
+        "raw": "The water. Swimming out there is my life.",
+        "kept": "The water. Swimming out there is my life.",
+        "ms": 121
+      }
+    ]
+  },
+  {
+    "run": "tuned:int8",
+    "loadMs": 420,
+    "bytes": 153729929,
+    "medianMs": 171,
+    "meanMs": 169,
+    "rejected": 0,
+    "replies": [
+      {
+        "bot": "Zoe",
+        "q": "how are you holding up out here?",
+        "raw": "Surviving, barely. Ask me again after we eat.",
+        "kept": "Surviving, barely. Ask me again after we eat.",
+        "ms": 151
+      },
+      {
+        "bot": "Zoe",
+        "q": "what's the first thing you'll eat when you get home",
+        "raw": "Bread. Just warm bread and butter. I'm not picky anymore.",
+        "kept": "Bread. Just warm bread and butter. I'm not picky anymore.",
+        "ms": 171
+      },
+      {
+        "bot": "Zoe",
+        "q": "that storm last night was wild",
+        "raw": "Brutal. The shelter leaked right on my face all nights ago.",
+        "kept": "Brutal. The shelter leaked right on my face all nights ago.",
+        "ms": 159
+      },
+      {
+        "bot": "Zoe",
+        "q": "do you think the next challenge will be a puzzle?",
+        "raw": "Honestly, anything but another puzzle. My brain is mush.",
+        "kept": "Honestly, anything but another puzzle. My brain is mush.",
+        "ms": 172
+      },
+      {
+        "bot": "Zoe",
+        "q": "are you nervous about tribal tonight?",
+        "raw": "A little, but talking to you helps.",
+        "kept": "A little, but talking to you helps.",
+        "ms": 112
+      },
+      {
+        "bot": "Zoe",
+        "q": "who's the most dangerous person here?",
+        "raw": "I'm not naming names. That's how you end up on the chopping block.",
+        "kept": "I'm not naming names. That's how you end up on the chopping block.",
+        "ms": 182
+      },
+      {
+        "bot": "Zoe",
+        "q": "what do you think the jury will care about?",
+        "raw": "Treat people well even when you cut them. That's the whole trick.",
+        "kept": "Treat people well even when you cut them. That's the whole trick.",
+        "ms": 184
+      },
+      {
+        "bot": "Zoe",
+        "q": "i'm bored, entertain me",
+        "raw": "Let's go find a crab and race it. Winner gets nothing.",
+        "kept": "Let's go find a crab and race it. Winner gets nothing.",
+        "ms": 159
+      },
+      {
+        "bot": "Zoe",
+        "q": "be honest, are you a robot?",
+        "raw": "I'm as real as these bug bites, trust me.",
+        "kept": "I'm as real as these bug bites, trust me.",
+        "ms": 144
+      },
+      {
+        "bot": "Zoe",
+        "q": "what's your favorite thing about the island?",
+        "raw": "A real bed. I've dreamed about it for years.",
+        "kept": "A real bed. I've dreamed about it for years.",
+        "ms": 147
+      },
+      {
+        "bot": "Ben",
+        "q": "how are you holding up out here?",
+        "raw": "I'm good! sunsets almost make up for everything.",
+        "kept": "I'm good! sunsets almost make up for everything.",
+        "ms": 151
+      },
+      {
+        "bot": "Ben",
+        "q": "what's the first thing you'll eat when you get home",
+        "raw": "Barely any. We should start rationing.",
+        "kept": "Barely any. We should start rationing.",
+        "ms": 158
+      },
+      {
+        "bot": "Ben",
+        "q": "that storm last night was wild",
+        "raw": "That wind nearly took the roof off. I'm still fixin.",
+        "kept": "That wind nearly took the roof off. I'm still fixin.",
+        "ms": 191
+      },
+      {
+        "bot": "Ben",
+        "q": "do you think the next challenge will be a puzzle?",
+        "raw": "Honestly, anything but another puzzle. My brain is mush.",
+        "kept": "Honestly, anything but another puzzle. My brain is mush.",
+        "ms": 188
+      },
+      {
+        "bot": "Ben",
+        "q": "are you nervous about tribal tonight?",
+        "raw": "I'm excited. I'll be straight with you. Or anything else, actually.",
+        "kept": "I'm excited. I'll be straight with you. Or anything else, actually.",
+        "ms": 236
+      },
+      {
+        "bot": "Ben",
+        "q": "who's the most dangerous person here?",
+        "raw": "Honestly? Everybody's playing. Some people just hide it better.",
+        "kept": "Honestly? Everybody's playing. Some people just hide it better.",
+        "ms": 168
+      },
+      {
+        "bot": "Ben",
+        "q": "what do you think the jury will care about?",
+        "raw": "Be honest about what you did. Juries smell lies from a mile away.",
+        "kept": "Be honest about what you did. Juries smell lies from a mile away.",
+        "ms": 195
+      },
+      {
+        "bot": "Ben",
+        "q": "i'm bored, entertain me",
+        "raw": "Let's go find a crab and race it. Winner gets nothing.",
+        "kept": "Let's go find a crab and race it. Winner gets nothing.",
+        "ms": 182
+      },
+      {
+        "bot": "Ben",
+        "q": "be honest, are you a robot?",
+        "raw": "Honestly I just want to get here today. Then go now.",
+        "kept": "Honestly I just want to get here today. Then go now.",
+        "ms": 190
+      },
+      {
+        "bot": "Ben",
+        "q": "what's your favorite thing about the island?",
+        "raw": "The water. Swimming out there is my life.",
+        "kept": "The water. Swimming out there is my life.",
+        "ms": 140
+      }
+    ]
+  },
+  {
+    "run": "light:int8",
+    "loadMs": 418,
+    "bytes": null,
+    "medianMs": 1087,
+    "meanMs": 957,
+    "rejected": 0,
+    "replies": [
+      {
+        "bot": "Zoe",
+        "q": "how are you holding up out here?",
+        "raw": "My neck seems okay with some strain but nothing overdoing it. We just started the challenge last week after our campfire failed yesterday. It wasn't much more than thirty minutes long since then...",
+        "kept": "My neck seems okay with some strain but nothing overdoing it.",
+        "ms": 1263
+      },
+      {
+        "bot": "Zoe",
+        "q": "what's the first thing you'll eat when you get home",
+        "raw": "If you mean food or water then stay away while eating. If that means it being spicy try some peanut butter sandwich with mustard or even a few slices of gingerbread so its comforting but doesn't smell",
+        "kept": "If you mean food or water then stay away while eating.",
+        "ms": 1266
+      },
+      {
+        "bot": "Zoe",
+        "q": "that storm last night was wild",
+        "raw": "It wasn't supposed to be that much of a challenge. Not anymore. That’s something else we both try too hard with every time we play a game or party tonight.",
+        "kept": "It wasn't supposed to be that much of a challenge. Not anymore.",
+        "ms": 1087
+      },
+      {
+        "bot": "Zoe",
+        "q": "do you think the next challenge will be a puzzle?",
+        "raw": "Absolutely! The puzzle may have some twists or clues that we don't see yet... but it's going to take us through all sorts of situations and puzzles that need solving. It'll probably start",
+        "kept": "Absolutely! The puzzle may have some twists or clues that we don't see yet...",
+        "ms": 1208
+      },
+      {
+        "bot": "Zoe",
+        "q": "are you nervous about tribal tonight?",
+        "raw": "No way. I won’t even think of it. All my thoughts fall into line with this day that just passed.",
+        "kept": "No way. I won’t even think of it. All my thoughts fall into line with this day that just passed.",
+        "ms": 861
+      },
+      {
+        "bot": "Zoe",
+        "q": "who's the most dangerous person here?",
+        "raw": "The ones that get into fights with kids or don't know how to ride a bike... That'd be me, wearing rags....",
+        "kept": "The ones that get into fights with kids or don't know how to ride a bike... That'd be me, wearing rags....",
+        "ms": 869
+      },
+      {
+        "bot": "Zoe",
+        "q": "what do you think the jury will care about?",
+        "raw": "They must be very curious how they got here without any way of knowing it's a trap yet. They won't even get close enough!",
+        "kept": "They must be very curious how they got here without any way of knowing it's a trap yet. They won't even get close enough!",
+        "ms": 909
+      },
+      {
+        "bot": "Zoe",
+        "q": "i'm bored, entertain me",
+        "raw": "What's your mood looking like after this?",
+        "kept": "What's your mood looking like after this?",
+        "ms": 388
+      },
+      {
+        "bot": "Zoe",
+        "q": "be honest, are you a robot?",
+        "raw": "My hearties! It feels as good to be a robot as it does being a human here.",
+        "kept": "My hearties! It feels as good to be a robot as it does being a human here.",
+        "ms": 738
+      },
+      {
+        "bot": "Zoe",
+        "q": "what's your favorite thing about the island?",
+        "raw": "The way it feels right with me body. The calmness of it all when I get stuck in meditation or tryin' yoga while watchin’ a movie without distraction. It reminds me that everything",
+        "kept": "The way it feels right with me body.",
+        "ms": 1206
+      },
+      {
+        "bot": "Ben",
+        "q": "how are you holding up out here?",
+        "raw": "My legs feel great. My hands seem stiff as glass when it comes down hard.",
+        "kept": "My legs feel great. My hands seem stiff as glass when it comes down hard.",
+        "ms": 605
+      },
+      {
+        "bot": "Ben",
+        "q": "what's the first thing you'll eat when you get home",
+        "raw": "My favorite meal – fresh bread with some pickles or cheese if it has them. That way your legs feel better than before.",
+        "kept": "My favorite meal – fresh bread with some pickles or cheese if it has them. That way your legs feel better than before.",
+        "ms": 797
+      },
+      {
+        "bot": "Ben",
+        "q": "that storm last night was wild",
+        "raw": "That thunderstorm we were all talking about just yesterday – it made us laugh so much but didn't help our spirits any better than anything else that day.",
+        "kept": "That thunderstorm we were all talking about just yesterday – it made us laugh so much but didn't help our spirits any better than anything else that day.",
+        "ms": 973
+      },
+      {
+        "bot": "Ben",
+        "q": "do you think the next challenge will be a puzzle?",
+        "raw": "My mind keeps spinning with every new question thrown our way. Yes we expect people of different ages can have fun together. Or maybe even just laugh together again after a while without knowing when it happens anymore",
+        "kept": "My mind keeps spinning with every new question thrown our way. Yes we expect people of different ages can have fun together.",
+        "ms": 1194
+      },
+      {
+        "bot": "Ben",
+        "q": "are you nervous about tribal tonight?",
+        "raw": "Yes! One night, two nights, we just lost our first headband-banger after all these years of being the only ones gonna get that gig anymore. I don’t know what else",
+        "kept": "Yes!",
+        "ms": 1191
+      },
+      {
+        "bot": "Ben",
+        "q": "who's the most dangerous person here?",
+        "raw": "In a few days we get hit with an avalanche. In that case, if I don't survive it happens all over again tomorrow night or today without me ever being alive again!",
+        "kept": "In a few days we get hit with an avalanche.",
+        "ms": 1157
+      },
+      {
+        "bot": "Ben",
+        "q": "what do you think the jury will care about?",
+        "raw": "They should just ask the question. What are your thoughts?",
+        "kept": "They should just ask the question. What are your thoughts?",
+        "ms": 473
+      },
+      {
+        "bot": "Ben",
+        "q": "i'm bored, entertain me",
+        "raw": "And it's time already! Keep playing the music please.",
+        "kept": "And it's time already! Keep playing the music please.",
+        "ms": 459
+      },
+      {
+        "bot": "Ben",
+        "q": "be honest, are you a robot?",
+        "raw": "Your mom! The good ones don't get much better than that. Yeah. That's what it means when someone gets up off their butt after all of those days...",
+        "kept": "Your mom! The good ones don't get much better than that. Yeah.",
+        "ms": 1091
+      },
+      {
+        "bot": "Ben",
+        "q": "what's your favorite thing about the island?",
+        "raw": "The jungle! And the sandstorms! They must be very important because everyone feels like it all comes down to them or else we wouldn’t have much of anything left after 10 am.",
+        "kept": "The jungle! And the sandstorms!",
+        "ms": 1401
+      }
+    ]
+  },
+  {
+    "run": "best:q4",
+    "loadMs": 819,
+    "bytes": null,
+    "medianMs": 740,
+    "meanMs": 719,
+    "rejected": 0,
+    "replies": [
+      {
+        "bot": "Zoe",
+        "q": "how are you holding up out here?",
+        "raw": "Took it easy. Just got some fresh air and a good walk through the woods. Nervous but relieved.",
+        "kept": "Took it easy. Just got some fresh air and a good walk through the woods. Nervous but relieved.",
+        "ms": 917
+      },
+      {
+        "bot": "Zoe",
+        "q": "what's the first thing you'll eat when you get home",
+        "raw": "Sticky bread with jam. Classic. My stomach wants crisper.",
+        "kept": "Sticky bread with jam. Classic. My stomach wants crisper.",
+        "ms": 740
+      },
+      {
+        "bot": "Zoe",
+        "q": "that storm last night was wild",
+        "raw": "Yeah, it was super rough. The rain kept coming, turned our campsite into a slippery mess.",
+        "kept": "Yeah, it was super rough. The rain kept coming, turned our campsite into a slippery mess.",
+        "ms": 815
+      },
+      {
+        "bot": "Zoe",
+        "q": "do you think the next challenge will be a puzzle?",
+        "raw": "Potentially. Puzzle-focused or just plain old brain-teasing. Either way, it’ll keep things interesting.",
+        "kept": "Potentially. Puzzle-focused or just plain old brain-teasing. Either way, it’ll keep things interesting.",
+        "ms": 795
+      },
+      {
+        "bot": "Zoe",
+        "q": "are you nervous about tribal tonight?",
+        "raw": "Tuesday night—trust me.",
+        "kept": "Tuesday night—trust me.",
+        "ms": 533
+      },
+      {
+        "bot": "Zoe",
+        "q": "who's the most dangerous person here?",
+        "raw": "That bossy guy with the cape and the gloomy grin. He definitely edges me up.",
+        "kept": "That bossy guy with the cape and the gloomy grin. He definitely edges me up.",
+        "ms": 742
+      },
+      {
+        "bot": "Zoe",
+        "q": "what do you think the jury will care about?",
+        "raw": "The best man. They’ll probably throw them away if they don’t nail it.\n\n",
+        "kept": "The best man. They’ll probably throw them away if they don’t nail it.",
+        "ms": 694
+      },
+      {
+        "bot": "Zoe",
+        "q": "i'm bored, entertain me",
+        "raw": "Just need a good laugh or two—playtime waiting!",
+        "kept": "Just need a good laugh or two—playtime waiting!",
+        "ms": 592
+      },
+      {
+        "bot": "Zoe",
+        "q": "be honest, are you a robot?",
+        "raw": "Not really. Just a scraper of code trying to make it work.",
+        "kept": "Not really. Just a scraper of code trying to make it work.",
+        "ms": 632
+      },
+      {
+        "bot": "Zoe",
+        "q": "what's your favorite thing about the island?",
+        "raw": "The way the wind blows over the saltwater and everything feels… wild. Always smells off-grid and charged with energy.",
+        "kept": "The way the wind blows over the saltwater and everything feels… wild. Always smells off-grid and charged with energy.",
+        "ms": 834
+      },
+      {
+        "bot": "Ben",
+        "q": "how are you holding up out here?",
+        "raw": "Took it easy. Just lay back and watch the stars come out.",
+        "kept": "Took it easy. Just lay back and watch the stars come out.",
+        "ms": 642
+      },
+      {
+        "bot": "Ben",
+        "q": "what's the first thing you'll eat when you get home",
+        "raw": "Eat the beans. They taste better than anything except water.",
+        "kept": "Eat the beans. They taste better than anything except water.",
+        "ms": 689
+      },
+      {
+        "bot": "Ben",
+        "q": "that storm last night was wild",
+        "raw": "Yeah, it felt intense. The wind howl was deafening, rain pelted everything off the roof—\n\n(leans back against the tent)",
+        "kept": "Yeah, it felt intense.",
+        "ms": 997
+      },
+      {
+        "bot": "Ben",
+        "q": "do you think the next challenge will be a puzzle?",
+        "raw": "Probably more than just a puzzle – maybe some tricky clues or a quick mental workout.",
+        "kept": "Probably more than just a puzzle – maybe some tricky clues or a quick mental workout.",
+        "ms": 754
+      },
+      {
+        "bot": "Ben",
+        "q": "are you nervous about tribal tonight?",
+        "raw": "Yeah, nervous. Everyone else’s probably winning this too.",
+        "kept": "Yeah, nervous. Everyone else’s probably winning this too.",
+        "ms": 627
+      },
+      {
+        "bot": "Ben",
+        "q": "who's the most dangerous person here?",
+        "raw": "The guy with the axe swing—he’s tougher than any of us but also leaves me feeling helpless.",
+        "kept": "The guy with the axe swing—he’s tougher than any of us but also leaves me feeling helpless.",
+        "ms": 792
+      },
+      {
+        "bot": "Ben",
+        "q": "what do you think the jury will care about?",
+        "raw": "They’ll want me to keep fighting until the last breath.",
+        "kept": "They’ll want me to keep fighting until the last breath.",
+        "ms": 584
+      },
+      {
+        "bot": "Ben",
+        "q": "i'm bored, entertain me",
+        "raw": "Late-night snack time. Classic Game Setup.",
+        "kept": "Late-night snack time. Classic Game Setup.",
+        "ms": 584
+      },
+      {
+        "bot": "Ben",
+        "q": "be honest, are you a robot?",
+        "raw": "Not really. Just a tool that helped me through tough times.",
+        "kept": "Not really. Just a tool that helped me through tough times.",
+        "ms": 607
+      },
+      {
+        "bot": "Ben",
+        "q": "what's your favorite thing about the island?",
+        "raw": "The beaches—lots of rocks and waves that make it feel peaceful, but hey, maybe some sandcastles too later.",
+        "kept": "The beaches—lots of rocks and waves that make it feel peaceful, but hey, maybe some sandcastles too later.",
+        "ms": 817
+      }
+    ]
+  }
+]

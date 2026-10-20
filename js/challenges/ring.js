@@ -3,6 +3,9 @@ import { sky, sun, sea, sand, wood, palm } from './draw.js';
 import { shuffle, rand } from '../util.js';
 
 const GROUND = 600, HAND = { x: 58, y: 530 };
+const GRAVITY = 900, POWER = 3.3;
+// How much of the way to the top of the arc the aim guide shows.
+const PREVIEW = { easy: 0.95, normal: 0.9, hard: 0.65 };
 
 export default {
   id: 'ring',
@@ -14,10 +17,12 @@ export default {
   how: '<b>Swipe</b> to flick a rope ring: the direction and length of your swipe set the throw. Ring <b>all four poles</b> to win.',
   goal: () => 4,
   expected: (d) => ({ easy: 24, normal: 36, hard: 50 })[d],
+  // Seconds the best bot takes (race) or lasts (endurance); see botResults.
+  firstPlace: { easy: [26, 40], normal: [30, 45], hard: [35, 52] },
   unit: 'poles',
   create(api) {
     const { W, H, diff } = api;
-    const tol = { easy: 15, normal: 11, hard: 8 }[diff];
+    const tol = { easy: 15, normal: 12, hard: 8 }[diff];
     const heights = shuffle([70, 120, 160, 200]);
     const poles = [168, 236, 302, 362].map((x, i) => ({ x0: x, x, h: heights[i], rings: 0, done: false, ph: rand(0, 6) }));
     let rings = [], swipe = null, ready = true, reload = 0, got = 0, done = false;
@@ -33,7 +38,7 @@ export default {
         for (const r of rings) {
           if (r.state === 'fly') {
             const py = r.y;
-            r.vy += 900 * dt;
+            r.vy += GRAVITY * dt;
             r.vx += wind * dt;
             r.x += r.vx * dt;
             r.y += r.vy * dt;
@@ -112,6 +117,16 @@ export default {
           const dx = swipe.cur.x - swipe.start.x, dy = swipe.cur.y - swipe.start.y;
           const len = Math.hypot(dx, dy);
           if (len > 10) {
+            // Aim guide: the real flight path, shown up to just short of the top of the arc (never past it).
+            const s = Math.min(len, 240) / len, vx = dx * s * POWER, vy = dy * s * POWER;
+            if (vy < 0) {
+              const apex = -vy / GRAVITY, upto = apex * PREVIEW[diff];
+              for (let tt = 0.05, i = 0; tt <= upto; tt += 0.045, i++) {
+                const px = HAND.x + vx * tt + 0.5 * wind * tt * tt, py = HAND.y + vy * tt + 0.5 * GRAVITY * tt * tt;
+                g.fillStyle = `rgba(255,255,255,${0.95 - (tt / Math.max(upto, 0.01)) * 0.6})`;
+                g.beginPath(); g.arc(px, py, 3.2, 0, Math.PI * 2); g.fill();
+              }
+            }
             const k = Math.min(1, len / 240), ux = dx / len, uy = dy / len, L = 20 + k * 60;
             g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 5; g.lineCap = 'round';
             g.beginPath(); g.moveTo(HAND.x, HAND.y); g.lineTo(HAND.x + ux * L, HAND.y + uy * L); g.stroke();
@@ -135,7 +150,7 @@ export default {
         const len = Math.hypot(dx, dy);
         if (len < 20) return;
         const k = Math.min(len, 240) / len;
-        rings.push({ x: HAND.x, y: HAND.y, vx: dx * k * 3.3, vy: dy * k * 3.3, rot: 0, vr: 12, state: 'fly' });
+        rings.push({ x: HAND.x, y: HAND.y, vx: dx * k * POWER, vy: dy * k * POWER, rot: 0, vr: 12, state: 'fly' });
         api.sfx('whoosh');
         ready = false; reload = 0.4;
       },

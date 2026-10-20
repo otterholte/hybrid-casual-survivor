@@ -1,0 +1,8 @@
+{
+  "name": "island-chat-compare",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@huggingface/transformers": "4.2.0"
+  }
+}
