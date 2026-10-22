@@ -464,6 +464,7 @@ export function botOpener(botId) {
       s.botTold[botId] = target;
       const why = reasonsAgainst(botId, target)[0].text;
       return {
+        claim: target,
         text: `${fresh(botId, [`I want ${nm(target)} out tonight.`, `I think it’s time ${nm(target)} goes.`, `Tonight I want ${nm(target)} gone.`, `It has to be ${nm(target)} tonight.`])} ${why} You in?`,
         options: [ask(`I'm in on ${nm(target)}`), ask('Who else is on board?'), ask(`I'd rather keep ${nm(target)}`)],
       };
@@ -474,6 +475,7 @@ export function botOpener(botId) {
   if (mySaid != null && P(mySaid).alive && plan === mySaid) add(`check:${mySaid}`, 1.3, () => {
     const with_ = aliveBots().filter((k) => k.id !== botId && k.id !== mySaid && s.plan[k.id] === mySaid).map((k) => k.name);
     return {
+      claim: mySaid,
       text: `Still good on ${nm(mySaid)}? ${with_.length && honest ? `${with_.slice(0, 2).join(' and ')} ${with_.length > 1 ? 'are' : 'is'} with us.` : 'I’m still working on a couple people.'}`,
       options: [ask(`I'm still in on ${nm(mySaid)}`), ask('Who else is on board?'), ask(`Why ${nm(mySaid)}?`)],
     };
@@ -555,6 +557,25 @@ export function botConvo(forceWith) {
   const msgs = [];
   const m = (from, to, text) => msgs.push({ from: from.id, to: to.id, text });
   const pa = s.plan[a.id], pb = s.plan[b.id];
+
+  // If you told b something about a, b may check it with a.
+  const relay = facts(b.id, (f) => thisRound(f) && f.kind === 'h_relay' && f.about === a.id && !f.checked).at(-1);
+  if (relay && chance(0.6)) {
+    relay.checked = true;
+    const real = s.botTold[a.id] ?? pa;
+    m(b, a, `${nm(H)} says you’re voting ${relay.target === H ? nm(H) : nm(relay.target)}. True?`);
+    if (real === relay.target || (!relay.made && chance(0.5))) {
+      m(a, b, 'Yeah, that’s right.');
+      adjTrust(b.id, H, 0.04);
+    } else {
+      m(a, b, `No? I never said that.`);
+      adjTrust(b.id, H, -0.2);
+      adjTrust(a.id, H, -0.15);
+      note(b.id, { src: a.id, kind: 'lied_to_me', about: H, target: relay.target });
+    }
+    computePlans();
+    return msgs;
+  }
 
   // Gossip first: what the human has been saying travels.
   const g = chance(0.45) ? gossipAboutHuman(a.id, b.id) : null;
@@ -881,9 +902,21 @@ export function botTakesAdvantage(botId, type) {
   const s = S();
   if (type === 'idolClue') {
     spendAdv(botId, type);
-    if (s.hiddenIdol) { s.hiddenIdol = null; P(botId).idols++; P(botId).stats.idolsFound++; s.idolSusp[botId] = Math.min(1, s.idolSusp[botId] + 0.2); }
+    if (s.hiddenIdol) { claimIdol(botId); s.idolSusp[botId] = Math.min(1, s.idolSusp[botId] + 0.2); }
   }
-  if (type === 'intel' || type === 'extraTrip') spendAdv(botId, type);
+  if (type === 'intel' || type === 'extraTrip' || type === 'spy') spendAdv(botId, type);
+}
+
+/** Someone takes the hidden idol. Its tile stays dug up, which you only learn by flipping it. */
+export function claimIdol(id) {
+  const s = S();
+  if (!s.hiddenIdol) return false;
+  s.idolGrid = s.idolGrid || { flipped: [], dug: [] };
+  if (s.hiddenIdol.tile != null) s.idolGrid.dug.push(s.hiddenIdol.tile);
+  s.hiddenIdol = null;
+  P(id).idols++;
+  P(id).stats.idolsFound++;
+  return true;
 }
 
 export function botBlockChoice(botId) {

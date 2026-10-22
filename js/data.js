@@ -67,6 +67,7 @@ export const ADVANTAGES = {
   extraVote: { name: 'Extra Vote', icon: '🗳️', tier: 'big', when: 'tribal', desc: 'Cast two votes at a Tribal Council of your choice.' },
   voteBlock: { name: 'Vote Blocker', icon: '🚫', tier: 'big', when: 'tribal', desc: 'Before the vote, stop one castaway from voting.' },
   intel: { name: 'Secret Intel', icon: '🔍', tier: 'small', when: 'camp', desc: 'At camp, learn who one castaway is really voting for.' },
+  spy: { name: 'Spy', icon: '👁️', tier: 'small', when: 'camp', desc: 'At camp, see who one castaway has been telling people they’re voting for.' },
   idolClue: { name: 'Idol Clue', icon: '📜', tier: 'small', when: 'camp', desc: 'At camp, go straight to the hidden idol’s location (if it’s still out there).' },
   extraTrip: { name: 'Extra Excursion', icon: '🧭', tier: 'small', when: 'camp', desc: 'Take a second excursion at camp.' },
 };

@@ -36,19 +36,22 @@ Every challenge has Easy / Normal / Hard tuning and a **Practice** mode with per
 | --- | --- | --- |
 | 🗳️ Extra Vote | 1st place | Cast two votes at a Tribal Council of your choice. |
 | 🚫 Vote Blocker | 1st place | Before the vote, stop one castaway from voting. |
-| 🔍 Secret Intel | 2nd place | At camp, learn who one castaway is really voting for. |
-| 📜 Idol Clue | 2nd place | At camp, go straight to the hidden idol's location. |
-| 🧭 Extra Excursion | 2nd place | Take a second excursion at camp. |
+| 👁️ Spy | 2nd place | At camp, see who one castaway has been telling people they're voting for. |
+| 📜 Idol Clue | 2nd place | At camp, the Idol Hunt highlights the row the idol is in. |
 
 Bots win and play advantages too, so watch the podium.
 
 ## Camp strategy
 
-- **Messages**: an inbox of every castaway with a preview of their latest message. Unread conversations are highlighted, and when someone asks you something you can tap a quick reply (Yes / Maybe / Not them / a name) right from the list.
-- **Group chats**: pick two or more castaways and talk to them together. Everyone hears everything, so a group agreeing on a vote pulls everyone in.
-- **Typed messages**: castaways understand a wide range of free text ("are you voting for me?", "what do you think of Maya?", "I'm voting Alex", "do you have the votes?"), and follow-ups like "would you vote for her?" refer to whoever you were just discussing. When they say how they'll vote and mean it, that commitment carries into their actual vote. Ask "Do you have the votes?" (also a quick message) and an honest castaway tells you who is really on board; a schemer bluffs.
-- **Spy** (excursion): sneak up on one castaway and overhear them for 15 seconds. Some words are garbled, and you might get caught.
-- **Idol search** (excursion): a memory match. Find the two 📜 clue cards to learn where the idol is hidden, then race there before time runs out. Someone else might get there first.
+**Strategy** opens the Vote Board: every castaway on one screen, no typing needed.
+
+- **Tap faces to select, then Ask or Tell.** Ask one person, or several together (they hear each other's answers) or separately.
+- **Tell** has two modes. **My vote** (blue): "My vote is Zoe." **Pass it on** (orange): "Rex told me he's voting Maya", or confess your own bluff: "I told Rex Priya, but I'm really on Maya." A private **I mean it / Bluff** switch only you see; relayed lies can get caught when castaways compare notes.
+- **Each castaway shows three things**: one chip for the vote you're counting on, what they told you (crossed out when you overrule it), and what you told them (✓ meant it or 🤥 bluff). Tap a chip to cycle: their word → ✓ believe it → ✎ my read (pick who you think they're really voting for).
+- **Votes** at the bottom tallies where you think the votes are. Castaways also pitch you with one-tap cards, and ask you back.
+- **👁️ Spy** (won by finishing 2nd in a challenge): see who someone has been telling people they're voting for, and how many people heard each story.
+- **🔒 Lock in** when you're ready to go to Tribal. The old message threads are still one tap away (💬), including free typing with Island AI.
+- **Idol Hunt**: a 10×10 grid. Each dig takes about two seconds, one tile at a time, and dug tiles stay darker across days. Find the idol tile to take it; if someone beat you to it, you only learn that by digging that exact tile. Stay away from Strategy for 20 seconds and you get a warning; at 25, people notice you're gone and start suspecting you have an idol.
 
 Bots remember promises. If you tell someone you're voting one way and then don't, they'll know, and so will the jury.
 

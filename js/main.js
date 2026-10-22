@@ -181,10 +181,11 @@ let challengeBag = [];
 
 function rollPrizes(final) {
   const S = game.S;
-  const small = ['intel', 'extraTrip'];
-  if (S.hiddenIdol || (S.idolsLeft > 0 && alive().length > 5)) small.push('idolClue', 'idolClue');
+  // 2nd place usually wins a Spy; sometimes an Idol Clue while an idol is still out there.
+  const small = ['spy', 'spy', 'spy'];
+  if (S.hiddenIdol || (S.idolsLeft > 0 && alive().length > 5)) small.push('idolClue');
   const big = pick(['extraVote', 'voteBlock']);
-  const sm = final ? 'intel' : pick(small);
+  const sm = final ? 'spy' : pick(small);
   return [{ id: big, ...ADVANTAGES[big] }, { id: sm, ...ADVANTAGES[sm] }];
 }
 

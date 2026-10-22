@@ -1,8 +1,10 @@
 // Back at Camp: talk to anyone (or a group) as much as you like, plus ONE excursion per day (spy or idol search).
 import { game, P, nm, alive, aliveBots, human, adjTrust } from './state.js';
-import { replyTo, botOpener, botConvo, computePlans, spendAdv, runErrand } from './ai.js';
+import { replyTo, botOpener, botConvo, computePlans, spendAdv, runErrand, claimIdol } from './ai.js';
 import { chatReply, understand, matchOption, isGameTalk, FLAVOR_INTENTS, GROUP_PRESETS, groupReply } from './chat.js';
 import { llm, chatter } from './llm.js';
+import { mountBoard } from './boardview.js';
+import { board, addCard } from './board.js';
 import { PRESETS, ZONES, ADVANTAGES } from './data.js';
 import { h, rand, pick, chance, sleep, weightedPick, shuffle, clock } from './util.js';
 import { show, toast, banner, setScene, setMusic, Timer, timerRing, avatarChip, modal } from './ui.js';
@@ -13,9 +15,12 @@ const PATIENCE = 6; // messages you can send each castaway (or group) per day
 
 export function hideIdolIfNeeded() {
   const S = game.S;
+  S.idolGrid = S.idolGrid || { flipped: [], dug: [] };
   if (!S.hiddenIdol && S.idolsLeft > 0 && alive().length > 4) {
     S.idolsLeft--;
-    S.hiddenIdol = { zone: pick(ZONES).id, spot: Math.floor(Math.random() * 8) };
+    // One tile of the 10×10 idol hunt; never one that's already been dug up.
+    const free = [...Array(100).keys()].filter((i) => !S.idolGrid.dug.includes(i));
+    S.hiddenIdol = { tile: pick(free), zone: pick(ZONES).id, spot: Math.floor(Math.random() * 8) };
   }
 }
 
@@ -24,9 +29,7 @@ function botIdolSearchTick(seconds) {
   if (!S.hiddenIdol) return null;
   for (const b of shuffle(aliveBots())) {
     if (chance(0.0007 * (0.5 + b.t.strategic) * seconds)) {
-      b.idols++;
-      b.stats.idolsFound++;
-      S.hiddenIdol = null;
+      claimIdol(b.id);
       S.idolSusp[b.id] = Math.min(1, S.idolSusp[b.id] + 0.15);
       return b;
     }
@@ -75,7 +78,9 @@ export function runCamp() {
     setScene('camp');
     setMusic('camp', 'beach');
 
-    let view = 'hub', finished = false, activity = null, openChatId = null, repaintChat = null;
+    let view = 'hub', finished = false, activity = null, openChatId = null, repaintChat = null, boardRef = null;
+    board(); // start (or carry over) this round's vote board
+    const readyCount = () => Math.min(alive().length - 1, Math.floor(elapsed / 15));
     const feed = [];
     const pushFeed = (txt, icon = '🌴') => {
       feed.unshift({ txt, icon });
@@ -135,6 +140,8 @@ export function runCamp() {
       const options = out.report.options?.map((o) => ({ label: o.label, fx: () => chatReply(e.bot, o.label, S.threads[e.bot]) }))
         ?? chatReply(e.bot, 'what have you heard?', S.threads[e.bot]).options;
       S.threads[e.bot].push({ from: e.bot, text: out.report.text, options, day });
+      addCard(e.bot, { text: out.report.text, options: [] });
+      if (view === 'board') boardRef?.paint();
       if (openChatId === e.bot) repaintChat?.();
       else {
         S.unread.add(e.bot);
@@ -150,11 +157,12 @@ export function runCamp() {
       const b = weightedPick(pool, (x) => x.t.social + Math.max(0, S.trust[x.id][0]) + 0.2);
       const op = botOpener(b.id);
       S.threads[b.id].push({ from: b.id, text: op.text, options: op.options, day });
+      addCard(b.id, op);
       if (openChatId === b.id) repaintChat?.();
       else {
-        S.unread.add(b.id);
         sfx('ping');
-        toast(`💬 New message from <b>${b.name}</b>`, 'msg');
+        if (view === 'board') boardRef?.paint();
+        else { S.unread.add(b.id); toast(`💬 <b>${b.name}</b> wants a word`, 'msg'); }
         if (view === 'hub' || view === 'inbox') render();
       }
     }
@@ -183,6 +191,14 @@ export function runCamp() {
 
     function render() {
       if (finished) return;
+      boardRef = null;
+      if (view === 'board') {
+        const wrap = h('div', { class: 'vb-wrap' });
+        body.replaceChildren(h('div', { class: 'stack' }, subHead('', 'hub'), wrap));
+        boardRef = mountBoard(wrap, { onLock: () => end(), openMessages: () => go('inbox'), readyCount, isOver: () => finished || view !== 'board' });
+        return;
+      }
+      if (view === 'hunt') return huntView();
       if (view === 'hub') body.replaceChildren(hubView());
       if (view === 'inbox') body.replaceChildren(inboxView());
       if (view === 'spy') body.replaceChildren(spyPick());
@@ -207,15 +223,13 @@ export function runCamp() {
       const n = S.unread.size;
       return h('div', { class: 'hub stack' },
         immuneBanner(),
-        h('button', { class: `strategy-card ${n ? 'has-new' : ''}`, onclick: () => go('inbox') },
-          h('div', { class: 'sc-ic' }, '💬'),
-          h('div', { class: 'sc-mid' }, h('div', { class: 'ac-t' }, 'Strategy'), h('div', { class: 'ac-s' }, 'Talk privately or in groups, as much as you want.')),
-          n ? h('span', { class: 'badge' }, `${n} new`) : h('span', { class: 'sc-arrow' }, '›')),
+        h('button', { class: `strategy-card ${board().cards.some((c) => !c.done) ? 'has-new' : ''}`, onclick: () => go('board') },
+          h('div', { class: 'sc-ic' }, '🗳️'),
+          h('div', { class: 'sc-mid' }, h('div', { class: 'ac-t' }, 'Strategy'), h('div', { class: 'ac-s' }, 'Ask, tell, and track where the votes are.')),
+          board().cards.some((c) => !c.done) ? h('span', { class: 'badge' }, 'new') : h('span', { class: 'sc-arrow' }, '›')),
         advantagePanel(),
-        h('div', { class: 'feed-title center' }, excursionsLeft <= 0 ? 'EXCURSIONS USED FOR TODAY' : excursionsLeft === 1 ? 'ONE EXCURSION · PICK ONE' : `${excursionsLeft} EXCURSIONS TODAY`),
-        h('div', { class: 'action-grid two' },
-          excursionCard('🗿', 'Idol Search', 'Find the clue, then race to the idol', 'search', 'a-idol'),
-          excursionCard('👀', 'Spy', 'Overhear one castaway', 'spy', 'a-spy')),
+        h('button', { class: 'action-card a-idol wide', onclick: () => go('hunt') },
+          h('div', { class: 'ac-ic' }, '🗿'), h('div', { class: 'ac-t' }, 'Idol Hunt'), h('div', { class: 'ac-s' }, 'Flip tiles to find the hidden idol. Stay away too long and people notice.')),
         feed.length ? h('div', { class: 'panel feed' }, h('div', { class: 'feed-title' }, 'AROUND CAMP'), ...feed.map((f) => h('div', { class: 'feed-row' }, h('span', {}, f.icon), h('span', {}, f.txt)))) : null,
         h('button', { class: 'btn btn-big', onclick: () => end() }, 'Go to Tribal Council'),
       );
@@ -227,7 +241,7 @@ export function runCamp() {
         h('div', { class: 'feed-title' }, 'YOUR ADVANTAGES'),
         ...me.advantages.map((type) => {
           const a = ADVANTAGES[type];
-          const use = type === 'intel' ? useIntel : type === 'idolClue' ? useClue : null;
+          const use = type === 'intel' ? useIntel : type === 'idolClue' ? useClue : type === 'spy' ? () => { go('board'); toast('Tap 👁️ SPY, then a face.'); } : null;
           return h('div', { class: 'adv-row' },
             h('span', { class: 'adv-ic' }, a.icon),
             h('div', { class: 'grow' }, h('b', {}, a.name), h('div', { class: 'muted' }, a.desc)),
@@ -254,7 +268,8 @@ export function runCamp() {
         if (!finished) render();
         return;
       }
-      go('clue');
+      S.idolGrid.clue = { row: Math.floor(S.hiddenIdol.tile / 10), round: S.round };
+      go('hunt');
     }
 
     function excursionCard(icon, title, sub, v, cls) {
@@ -285,7 +300,7 @@ export function runCamp() {
       const rows = aliveBots().map((b) => ({ b, last: S.threads[b.id].at(-1) }))
         .sort((x, y) => (S.unread.has(y.b.id) - S.unread.has(x.b.id)) || (!!pendingFor(y.b.id) - !!pendingFor(x.b.id)) || ((y.last ? 1 : 0) - (x.last ? 1 : 0)));
       return h('div', { class: 'stack' },
-        subHead('Messages', 'hub', h('button', { class: 'chip-btn', onclick: newGroup }, '＋ Group')),
+        subHead('Messages', 'board', h('button', { class: 'chip-btn', onclick: newGroup }, '＋ Group')),
         ...S.groups.map((g) => {
           const last = g.thread.at(-1);
           return h('div', { class: 'talk-row', onclick: () => openGroup(g) },
@@ -711,6 +726,82 @@ export function runCamp() {
         body.replaceChildren(h('div', { class: 'search' }, h('div', { class: 'search-info' }, h('span', {}, 'Get to the idol!'), ring3), status, stage));
         activity = { kind: 'search', stop: () => t.stop() };
       }
+    }
+
+    // ---------- idol hunt: a 10×10 grid; each flip takes time, and being away gets noticed ----------
+    const FLIP_MS = 1100, SHOW_MS = 800, WARN_AT = 20, SEEN_AT = 25;
+    const DUDS = ['🐚', '🦀', '🪨', '🌿', '🥥', '🍂', '🐜', '🪵'];
+    function huntView() {
+      const G = S.idolGrid;
+      let busy = false, away = 0, flippedNow = 0, seen = false;
+      const clueRow = G.clue && G.clue.round === S.round && S.hiddenIdol ? G.clue.row : null;
+      const status = h('div', { class: 'hunt-status' }, clueRow != null ? `📜 Your clue says: row ${clueRow + 1}.` : 'Tap a tile to dig. One at a time.');
+      const awayBar = h('div', { class: 'hunt-away' });
+      const tiles = [...Array(100).keys()].map((i) => {
+        const t = h('button', { class: `hunt-tile ${G.flipped.includes(i) ? 'searched' : ''} ${clueRow != null && Math.floor(i / 10) === clueRow ? 'clue' : ''}` }, h('span', { class: 'ht-back' }), h('span', { class: 'ht-front' }));
+        t.addEventListener('click', () => flip(i, t));
+        return t;
+      });
+      const count = h('span', {}, 'Dug today: 0');
+      body.replaceChildren(h('div', { class: 'hunt stack' },
+        subHead('Idol Hunt', 'hub', h('button', { class: 'chip-btn', onclick: () => go('board') }, '🗳️ Strategy')),
+        h('div', { class: 'hunt-info' }, count, h('span', { class: 'muted' }, 'Darker tiles: already dug')),
+        h('div', { class: 'hunt-grid' }, ...tiles),
+        status, awayBar));
+
+      async function flip(i, t) {
+        if (busy || finished || view !== 'hunt') return;
+        busy = true;
+        sfx('dig');
+        t.classList.add('flipping');
+        await sleep(FLIP_MS);
+        if (finished || view !== 'hunt') return;
+        const front = t.querySelector('.ht-front');
+        if (!G.flipped.includes(i)) G.flipped.push(i);
+        flippedNow++;
+        count.textContent = `Dug today: ${flippedNow}`;
+        if (S.hiddenIdol && S.hiddenIdol.tile === i) {
+          front.textContent = '🗿';
+          t.classList.remove('flipping'); t.classList.add('up', 'found');
+          claimIdol(0);
+          sfx('idol');
+          await banner({ title: 'Hidden Immunity Idol', sub: 'Play it at Tribal Council after the votes are cast and before they’re read. Votes against whoever you protect won’t count.<br><b>Keep it secret.</b>', icon: '<div class="idol-big">🗿</div>', tone: 'gold', tap: true });
+          busy = false;
+          if (!finished) go('hub');
+          return;
+        }
+        const dug = G.dug.includes(i);
+        front.textContent = dug ? '🕳️' : pick(DUDS);
+        t.classList.remove('flipping'); t.classList.add('up');
+        if (dug) { status.textContent = 'A freshly dug hole. Someone already found an idol here.'; sfx('fail'); }
+        await sleep(SHOW_MS);
+        t.classList.remove('up'); t.classList.add('searched');
+        busy = false;
+      }
+
+      // Time away from Strategy: a warning at 20s, people notice at 25s.
+      const iv = setInterval(() => {
+        if (finished || view !== 'hunt') return clearInterval(iv);
+        if (clock.paused) return;
+        away++;
+        if (away >= WARN_AT && away < SEEN_AT) {
+          awayBar.className = 'hunt-away warn';
+          awayBar.textContent = `⚠️ You’ve been gone a while. People will notice in ${SEEN_AT - away}…`;
+          if (away === WARN_AT) sfx('tick');
+        } else if (away >= SEEN_AT) {
+          awayBar.className = 'hunt-away seen';
+          awayBar.textContent = '👀 People noticed you’re gone. They’ll think you’re looking for an idol.';
+          if (!seen || (away - SEEN_AT) % 10 === 0) {
+            S.idolSusp[0] = Math.min(1, S.idolSusp[0] + (seen ? 0.05 : 0.15));
+            if (!seen) { const w = pick(aliveBots()); if (w) pushFeed(`${w.name} noticed you’ve been gone a long time.`, '👀'); sfx('fail'); }
+            seen = true;
+          }
+        } else {
+          awayBar.className = 'hunt-away';
+          awayBar.textContent = `Away from camp: ${away}s`;
+        }
+      }, 1000);
+      activity = { kind: 'hunt', stop: () => clearInterval(iv) };
     }
 
     function pickName(prompt, ids) {
