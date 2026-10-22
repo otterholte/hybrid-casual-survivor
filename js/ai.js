@@ -101,7 +101,7 @@ function askedWho(botId, exclude = []) {
   return namesOptions(botId, exclude, (c) => {
     const s = S();
     s.promises[botId] = c;
-    if (s.plan[botId] === c) { adjTrust(botId, H, 0.1); return 'Same. Good, we’re on the same page.'; }
+    if (s.plan[botId] === c) { adjTrust(botId, H, 0.1); s.botTold[botId] = c; return pick([`${nm(c)}. Yeah, I can get behind that.`, `${nm(c)}? Honestly, I was leaning that way too.`]); }
     if (s.allied[botId][c]) { adjTrust(botId, H, -0.15); return `${nm(c)}? Oh. I can’t do that one.`; }
     s.influence[botId][c] += 0.25 + Math.max(0, s.trust[botId][H]) * 0.5;
     computePlans();
@@ -210,8 +210,11 @@ export function replyTo(botId, presetId, target, freeText) {
     }
     case 'numbers': {
       // "Do you have the votes?" answered from real plans: who is actually on the name this bot is pushing.
-      const honest = tr + bt.honesty * 0.5 > 0.45;
+      // Whether it levels with you is decided once per round and target, so the story doesn't change.
       let X = target ?? s.botTold[botId] ?? plan;
+      const claims = (mind(botId).claims = mind(botId).claims || {});
+      const prior = X != null && claims[X]?.r === s.round ? claims[X] : null;
+      const honest = prior ? prior.honest : tr + bt.honesty * 0.5 > 0.45;
       if (X === botId) return { text: pick(['For me? I really hope nobody has those.', 'If someone has the votes for me, nobody told me.']) };
       if (X === H) { // they're coming for you; never admit it unless very honest and fond of you
         if (bt.honesty > 0.85 && tr > 0.3) return { text: 'Honestly? The numbers I’m hearing are on you. I don’t like it either.' };
@@ -224,19 +227,25 @@ export function replyTo(botId, presetId, target, freeText) {
       let meIn = on.some((k) => k.id === botId);
       const youIn = s.promises[botId] === X;
       let others = on.filter((k) => k.id !== botId).sort((a, b) => s.trust[botId][b.id] - s.trust[botId][a.id]).map((k) => k.name);
+      claims[X] = { r: s.round, honest, padded: prior?.padded || null };
       if (!honest) {
-        // A bluffer still answers the question: it names names, padding the list with people who aren't really in.
+        // A bluffer still answers the question: it names names, padding the list with people who aren't
+        // really in, and sticks to the same padding for the rest of the round.
         meIn = true;
-        const padding = shuffle(aliveBots().filter((k) => k.id !== X && k.id !== botId && s.plan[k.id] !== X)).map((k) => k.name);
-        const want = Math.max(1, need - 1 - (youIn ? 1 : 0) - others.length);
-        others = [...others, ...padding.slice(0, Math.min(2, want))];
+        if (!claims[X].padded) {
+          const want = Math.max(1, need - 1 - (youIn ? 1 : 0) - others.length);
+          claims[X].padded = shuffle(aliveBots().filter((k) => k.id !== X && k.id !== botId && s.plan[k.id] !== X)).slice(0, Math.min(2, want)).map((k) => k.id);
+        }
+        const pad = claims[X].padded.filter((id) => P(id).alive && !others.includes(nm(id))).map(nm);
+        others = [...others, ...pad];
       } else if (!meIn) {
         const now = plan != null && plan !== H && plan !== X ? ` Right now I’m leaning ${nm(plan)}. ${reasonsAgainst(botId, plan)[0].text}` : ' Give me a minute.';
         return { text: `Honestly? I’m not even sure I’m on ${nm(X)} anymore.${now}` };
       }
       const count = others.length + 1 + (youIn ? 1 : 0);
-      const crew = [...others.slice(0, 2), 'me'];
-      const extra = others.length > 2 ? ` and ${others.length - 2} more` : '';
+      const full = freeText === 'full';
+      const crew = [...(full ? others : others.slice(0, 2)), 'me'];
+      const extra = !full && others.length > 2 ? ` and ${others.length - 2} more` : '';
       const list = (crew.length > 1 ? (extra ? crew.join(', ') : `${crew.slice(0, -1).join(', ')} and ${crew.at(-1)}`) : crew[0]) + extra;
       const join = youIn ? undefined : [
         { label: 'Count me in', fx: () => { backingVote(botId, X); return count + 1 >= need ? `Then it’s done. ${nm(X)} goes tonight.` : 'Good. That helps. Keep it quiet.'; } },
@@ -301,6 +310,101 @@ function freeReply(botId, text) {
   if (named) return { text: pick([`${named.name}? I’ve been watching them too.`, `Careful talking about ${named.name} out loud.`]) };
   adjTrust(botId, H, 0.02);
   return { text: pick(['Ha, yeah.', 'Totally. It’s brutal out here.', 'I hear you.', 'Mm-hm. Interesting.']) };
+}
+
+// ------------------------------------------------------------------
+// Errands: the human asks a castaway to go talk to someone. If it agrees, it really does: the
+// conversation changes what the other castaway knows or plans, and it comes back with a report.
+// ------------------------------------------------------------------
+export function startErrand(botId, kind, target, about) {
+  const s = S(), b = P(botId), tr = s.trust[botId][H];
+  const t = P(target);
+  if (target === botId) return { text: 'I’m right here. Ask me.' };
+  if (target === H) return { text: 'Talk to you? We’re talking.' };
+  if (!t.alive) return { text: `${t.name}’s gone. Sitting on the jury now.` };
+  const them = t.look?.gender === 'f' ? 'her' : 'him';
+  let Y = about;
+  if (kind === 'pitch' && Y == null) Y = humanSaidVote(botId) ?? s.promises[botId] ?? s.botTold[botId] ?? null;
+  if (kind === 'pitch' && (Y == null || Y === target)) return { text: `Convince ${t.name} to do what? Give me a name.`, options: candidates(botId, [H, target]).slice(0, 3).map((c) => ({ label: `Get ${t.name} on ${nm(c)}`, fx: () => startErrand(botId, 'pitch', target, c) })) };
+  if (kind === 'pitch' && Y === botId) return { text: `You want me to get ${t.name} to vote ME out? Hard pass.` };
+  if (kind === 'warn' && Y == null) return { text: `Tell ${t.name} who’s after ${them}? You’ll have to give me a name.` };
+  // Will this castaway run your errand? Depends how much it trusts you, and whether it hurts its own game.
+  const busy = (s.errands || []).filter((e) => e.bot === botId && !e.done).length;
+  if (busy >= 2) return { text: 'One thing at a time. I’m still working on what you already asked.' };
+  const hurtsMe = kind === 'pitch' && (s.allied[botId][Y] || s.trust[botId][Y] > 0.45);
+  const willing = !hurtsMe && (tr > 0.05 || (b.t.social > 0.65 && tr > -0.15) || s.allied[botId][H]);
+  if (!willing) {
+    adjTrust(botId, H, -0.02);
+    return { text: hurtsMe ? `${nm(Y)}? No. I’m not pitching that.` : fresh(botId, [`I’m not your messenger. Talk to ${t.name} yourself.`, `Why would I stick my neck out for that? You go talk to ${them}.`]) };
+  }
+  s.errands = s.errands || [];
+  s.errands.push({ bot: botId, kind, target, about: Y, due: (s.campElapsed || 0) + rand(9, 18), day: s.day, done: false });
+  markAsked(botId, `errand:${kind}:${target}`);
+  const spot = fresh(botId, ['by the well', 'down at the water', 'on the way to get firewood', 'at the fire', 'when we go fishing']);
+  const what = kind === 'pitch' ? `I’ll work on ${them} about ${nm(Y)}` : kind === 'warn' ? `I’ll warn ${them} about ${nm(Y)}` : kind === 'vouch' ? `I’ll tell ${them} you’re with ${them}` : `I’ll feel ${them} out`;
+  return { text: `${fresh(botId, ['On it.', 'Okay. Leave it to me.', 'Yeah, I can do that.'])} ${what}. I’ll catch ${t.name} ${spot} and come find you.` };
+}
+
+/** Carry out one errand: a real conversation with real effects, and an honest-ish report back. */
+export function runErrand(e) {
+  const s = S(), b = P(e.bot), t = P(e.target);
+  e.done = true;
+  if (!b.alive || !t.alive) return null;
+  const he = t.look?.gender === 'f' ? 'she' : 'he', him = t.look?.gender === 'f' ? 'her' : 'him';
+  const cap = (x) => x[0].toUpperCase() + x.slice(1);
+  const msgs = [];
+  const m = (from, to, text) => msgs.push({ from, to, text });
+  const level = s.trust[e.bot][H] + b.t.honesty * 0.5 > 0.4; // does it tell you straight
+  let report;
+  if (e.kind === 'feel_out') {
+    const plan = s.plan[e.target];
+    const opens = s.trust[e.target][e.bot] + t.t.honesty * 0.5 > 0.4;
+    const said = opens ? plan : pick(candidates(e.target, [e.target, plan].filter((x) => x != null)));
+    m(e.bot, e.target, 'Where’s your head at for tonight?');
+    m(e.target, e.bot, said == null ? 'Honestly? Still deciding.' : `Between us? ${said === e.bot ? 'Not you, if that’s what you’re asking.' : nm(said)}.`);
+    if (said != null) note(e.bot, { src: e.target, kind: 'b_pitch', about: e.target, target: said });
+    const whoText = said == null ? 'nobody yet' : said === H ? 'you. Sorry' : said === e.bot ? 'me, apparently' : nm(said);
+    report = level
+      ? `Talked to ${t.name}. ${cap(he)} says ${he}’s on ${whoText}.${opens ? '' : ' I’m not sure I believe it, though.'}`
+      : `Talked to ${t.name}. Hard to read. ${cap(he)} didn’t give me much.`;
+    return { report: { text: report, options: said != null && said !== H && said !== e.bot ? [{ label: `I'm in on ${nm(said)}`, fx: null }, { label: `Why ${nm(said)}?`, fx: null }] : null }, msgs };
+  }
+  if (e.kind === 'pitch') {
+    const Y = e.about;
+    const before = s.plan[e.target];
+    m(e.bot, e.target, `I think it should be ${nm(Y)} tonight. ${reasonsAgainst(e.bot, Y)[0].text}`);
+    if (s.allied[e.target][Y] || s.trust[e.target][Y] > 0.45) {
+      m(e.target, e.bot, `${nm(Y)}? No. ${nm(Y)}’s with me.`);
+      s.influence[e.target][Y] += 0.05;
+    } else {
+      s.influence[e.target][Y] += 0.3 * Math.max(0.15, s.trust[e.target][e.bot] + 0.35);
+      note(e.target, { src: e.bot, kind: 'b_pitch', about: e.bot, target: Y });
+      computePlans();
+      m(e.target, e.bot, s.plan[e.target] === Y ? `Okay. I can do ${nm(Y)}.` : 'I hear you. Let me think about it.');
+    }
+    const flipped = s.plan[e.target] === Y;
+    report = flipped
+      ? `Good news. ${t.name} is on ${nm(Y)} now.${before === Y ? ' (Turns out ' + he + ' already was.)' : ''}`
+      : `I tried. ${t.name} wasn’t sold on ${nm(Y)}. ${level && s.plan[e.target] != null && s.plan[e.target] !== H ? `${cap(he)}’s still leaning ${s.plan[e.target] === e.bot ? 'me' : nm(s.plan[e.target])}.` : ''}`;
+    return { report: { text: report.trim() }, msgs };
+  }
+  if (e.kind === 'vouch') {
+    const believes = s.trust[e.target][e.bot] > 0.15;
+    adjTrust(e.target, H, believes ? 0.12 : 0.04);
+    m(e.bot, e.target, `For what it’s worth, ${nm(H)} is with you. I’d trust that.`);
+    m(e.target, e.bot, believes ? 'Good to know. Thanks.' : 'Hm. Okay.');
+    computePlans();
+    return { report: { text: believes ? `Told ${t.name} you’re with ${him}. ${cap(he)} seemed relieved.` : `Told ${t.name}. ${cap(he)} didn’t say much. Not sure ${he} bought it from me.` }, msgs };
+  }
+  // warn
+  const Y = e.about;
+  note(e.target, { src: e.bot, kind: 'targeting_me', about: Y });
+  adjTrust(e.target, Y, -0.15);
+  s.influence[e.target][Y] += 0.2;
+  computePlans();
+  m(e.bot, e.target, `Heads up. ${nm(Y)} has been saying your name.`);
+  m(e.target, e.bot, s.trust[e.target][Y] > 0.4 ? `${nm(Y)}? I don’t buy it.` : `${nm(Y)}. Okay. Thank you.`);
+  return { report: { text: s.trust[e.target][Y] > 0.4 ? `Told ${t.name} about ${nm(Y)}. ${cap(he)} didn’t believe me. They’re close.` : `Told ${t.name} that ${nm(Y)} is after ${him}. ${cap(he)} did NOT take it well. ${s.plan[e.target] === Y ? `${cap(he)}’s on ${nm(Y)} now.` : ''}`.trim() }, msgs };
 }
 
 // Bots reaching out to the human on their own. Each bot picks the most pressing thing it has to

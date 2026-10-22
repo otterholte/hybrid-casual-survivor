@@ -1,7 +1,7 @@
 // Understands typed messages and answers from the bot's real game state and memory (mind.js).
 // The reply also records what the human said, and what the bot "said" it would do; both feed votes.
 import { game, P, nm, alive, aliveBots, adjTrust } from './state.js';
-import { candidates, computePlans, replyTo, backingVote, perceivedDanger } from './ai.js';
+import { candidates, computePlans, replyTo, backingVote, perceivedDanger, startErrand } from './ai.js';
 import { mind, note, facts, thisRound, fresh, reasonsAgainst, reasonsToKeep, recordHuman, humanSaidVote, markAsked, wasAsked, pronoun, partnerOf } from './mind.js';
 import { pick, chance, shuffle } from './util.js';
 import { ZONES } from './data.js';
@@ -21,7 +21,7 @@ const VOICE = {
 };
 const SOFT_START = /^(whoa|okay|ok|hm+|yes|no|same|honestly|between|we|you|that|this|it|the|maybe|let's|let’s|not|ha|sure|thanks|stop|relax|good|perfect|absolutely|still|always|nobody|everyone|easy|interesting|really|wow|cool|fine|what|why|deal|of|as|just)\b/i;
 export const voice = (b, text) => {
-  if (!chance(0.3) || /^(Honestly|Look|Okay|Real talk|Hm|Ha|Between|Listen|Logically|I mean|So,)\b/.test(text)) return text;
+  if (!chance(0.3) || text.length < 30 || /^(Honestly|Look|Okay|Real talk|Hm|Ha|Between|Listen|Logically|I mean|So,)\b/.test(text)) return text;
   const lead = pick(VOICE[P(b).arch] || ['Hm.']);
   // After "Okay so," the sentence continues, so drop its capital (but not for "I" or a name).
   const keepCap = /^I\b|^I[’']/.test(text) || alive().some((p) => text.startsWith(p.name));
@@ -32,7 +32,10 @@ export const voice = (b, text) => {
 /** Finds every living castaway named in the text (other than the bot being spoken to, unless that's the only name). */
 export function namesIn(text, botId) {
   const low = ` ${text.toLowerCase()} `;
-  const found = alive().filter((p) => !p.human && new RegExp(`[^a-z]${p.name.toLowerCase()}[^a-z]`).test(low)).map((p) => p.id);
+  // In the order they were typed: "convince Sofia to vote Zoe" means Sofia first.
+  const found = alive().filter((p) => !p.human && new RegExp(`[^a-z]${p.name.toLowerCase()}[^a-z]`).test(low))
+    .sort((a, b) => low.search(new RegExp(`[^a-z]${a.name.toLowerCase()}[^a-z]`)) - low.search(new RegExp(`[^a-z]${b.name.toLowerCase()}[^a-z]`)))
+    .map((p) => p.id);
   const others = found.filter((id) => id !== botId);
   return others.length ? others : found;
 }
@@ -52,34 +55,69 @@ function topicOf(thread, botId, gender = null) {
 
 const PRONOUN = /\b(him|her|them|he|she|they|that one|that person|that guy|that girl)\b/;
 const IDOL = '(idol|hidden immunity|advantage)';
-const NUMBERS = /((have|got|has|get) (the|enough|any|other|more|any other) (votes|numbers|people)|enough (votes|people|numbers)|(the )?numbers (there|good|on your side|looking)|are the numbers|how are the numbers|do we have (it|enough|them|the votes|the numbers)|make sure we have|is it (locked|locked in|happening|going down|a done deal)|who('s| is) (with|voting with|on board with|on) you\b|who('s| is) on your side|who('s| is) in( on (it|this|that))?\??$|who('s| is) on board|who else|who('s| is| are) (all )?voting (for|with)|how many (votes|people|of us)|who all is in|count(ing)? (votes|heads)|other votes|more votes)/;
+const ERRAND = /((can|could|will|would) you (please |maybe |go |quickly )*(talk to|speak (to|with)|chat with|ask|find out|feel out|check (with|on|in with)|convince|persuade|get|tell|let \w+ know|pitch|work on|see (if|what|where|who)|figure out|go to|go see|sound out|bring|flip|sway)|^(please |pls |go |quick |now )*(talk to|speak (to|with)|ask|find out|feel out|check (with|on|in with)|convince|persuade|get|tell|let \w+ know|pitch|work on|see (if|what|where|who)|figure out|go see|sound out|bring|flip|sway)\b|(i need|i want) you to (talk|speak|ask|find|feel|check|convince|persuade|get|tell|pitch|work|see|figure|go)|go (talk|speak|ask) )/;
+const NUMBERS = /((have|got|has|get) (the|enough|any|other|more|any other) (votes|numbers|people)|enough (votes|people|numbers)|(the )?numbers (there|good|on your side|looking)|are the numbers|how are the numbers|do we have (it|enough|them|the votes|the numbers)|make sure we have|is it (locked|locked in|happening|going down|a done deal)|who('s| is) (with|voting with|on board with|on) you\b|who('s| is) on your side|who('s| is) in( on (it|this|that))?\??$|who('s| is) on board|who else|who('s| is| are) (all )?voting (for|with)|who all (is|are) (voting|in|with)|how many (votes|people|of us)|who all is in|count(ing)? (votes|heads)|other votes|more votes)/;
 const BADMOUTH = /(cagey|sketchy|shady|wild ?card|snake|dangerous|can't (be )?trust|cannot trust|untrustworthy|lying|\bliar\b|playing (everyone|both sides|us)|too close|power couple|annoying|lazy|\bweak\b|sneaky|\bfake\b|two[- ]faced|running (things|the game|this)|in control|big threat|a threat|so strong|too strong|keeps winning|can't be trusted|is bad news|is trouble|is a problem|is playing hard|bossy)/;
 
 /** Strategy talk the small-talk model must never answer (it isn't allowed to mention votes). */
-export const isGameTalk = (text) => /\b(vot\w*|numbers|target\w*|blindside\w*|flip\w*|idol\w*|alliance\w*|majority|on board|go(ing)? home|send \w+ home|boot\w*|threat|tribal|final (two|2|three|3)|trust)\b/i.test(text)
+export const isGameTalk = (text) => /\b(vot\w*|numbers|target\w*|blindside\w*|flip\w*|idol\w*|alliance\w*|majority|on board|go(ing)? home|send \w+ home|boot\w*|threat|tribal|final (two|2|three|3)|trust|swing)\b|^\s*(who|which|how many)\b/i.test(text)
   || namesIn(text, -1).length > 0;
 
+// How people actually type: no apostrophes, shorthand, doubled punctuation.
+const SHORTHAND = [
+  [/\bwhos\b/g, "who's"], [/\bwhats\b/g, "what's"], [/\bwheres\b/g, "where's"], [/\bhows\b/g, "how's"], [/\bthats\b/g, "that's"],
+  [/\bim\b/g, "i'm"], [/\bive\b/g, "i've"], [/\bill\b/g, "i'll"], [/\bid\b/g, "i'd"], [/\bdont\b/g, "don't"], [/\bcant\b/g, "can't"],
+  [/\bwont\b/g, "won't"], [/\bdidnt\b/g, "didn't"], [/\bisnt\b/g, "isn't"], [/\barent\b/g, "aren't"], [/\byoure\b/g, "you're"],
+  [/\btheyre\b/g, "they're"], [/\bhes\b/g, "he's"], [/\bshes\b/g, "she's"], [/\blets\b/g, "let's"], [/\bu\b/g, 'you'], [/\bur\b/g, 'your'],
+  [/\br\b/g, 'are'], [/\bpls\b|\bplz\b/g, 'please'], [/\bppl\b/g, 'people'], [/\bw\/\b/g, 'with'], [/\btn\b|\btonite\b/g, 'tonight'],
+  [/\bgonna\b/g, 'going to'], [/\bwanna\b/g, 'want to'], [/\bgotta\b/g, 'got to'], [/\bkinda\b/g, 'kind of'], [/\bidk\b/g, "i don't know"],
+  [/\bidol\w*\b/g, (m) => (m.startsWith('idols') ? 'idols' : 'idol')], [/\b(\d+) more\b/g, '$1 more'],
+];
+export function normalize(text) {
+  let t = String(text || '').toLowerCase().replace(/[’']/g, "'").replace(/\s+/g, ' ').trim();
+  for (const [re, to] of SHORTHAND) t = t.replace(re, to);
+  t = t.replace(/([?!.])\1+/g, '$1');
+  // Leading filler ("yeah, i'm in", "ok so who's the target", "honestly ...") doesn't change the meaning.
+  const stripped = t.replace(/^((yeah|yea|yes|yep|ok(ay)?|so|um+|uh+|well|honestly|hey|lol|alright|and|but|wait|oh)[,!.]? +)+/, '');
+  return stripped.length >= 2 ? stripped : t;
+}
+
 export function understand(text, botId, thread) {
-  const t = text.toLowerCase().replace(/[’']/g, "'").trim();
+  const t = normalize(text);
   const names = namesIn(t, botId);
   // "vote for her", "what about him": follow-ups refer to whoever was just being discussed.
   const g = /\b(her|she)\b/.test(t) ? 'f' : /\b(him|he|his)\b/.test(t) ? 'm' : null;
   const X = names[0] ?? (PRONOUN.test(t) ? topicOf(thread, botId, g) : null);
   const I = (intent) => ({ intent, X, names, t, topic: X ?? topicOf(thread, botId) });
-  if (has(/(you('re| are) (lying|a liar|a snake|fake|two[- ]faced)|you voted (for )?me|you wrote my name|backstab|betray)/, t) || (X == null && has(/\b(liar|snake)\b/, t))) return I('accuse');
+  if (has(/(you('re| are) (lying|a liar|a snake|fake|two[- ]faced)|you lied|lied to me|you('re| are) a liar|you voted (for )?me|you wrote my name|backstab|betray|you played me|you used me)/, t) || (X == null && has(/\b(liar|snake)\b/, t))) return I('accuse');
   if (has(/\b(stupid|idiot|dumb|you suck|hate you|shut up|loser|clown)\b/, t)) return I('insult');
-  if (has(/(don't vote (for )?me|keep me|save me|spare me|please don't|don't want to go home|don't send me home)/, t)) return I('dont_vote_me');
+  if (has(/(don't vote (for )?me|keep me|save me|spare me|please don't vote|don't want to go home|don't send me home)/, t)) return I('dont_vote_me');
+  // Errands: asking this castaway to go do something with someone else.
+  if (has(ERRAND, t)) {
+    const who = names.find((k) => k !== botId) ?? (PRONOUN.test(t) ? topicOf(thread, botId, g) : null);
+    if (who != null) {
+      const rest = names.filter((k) => k !== who && k !== botId);
+      let kind = 'feel_out';
+      if (/\btell\b|let (\w+ )?know|pass (it )?on/.test(t) && /(after|targeting|coming for|gunning for|wants (\w+ )?out|said (his|her|their) name)/.test(t)) kind = 'warn';
+      else if (/\btell\b|let (\w+ )?know|pass (it )?on/.test(t)) kind = 'vouch';
+      else if (/(convince|persuade|pitch|work on|bring|get (\w+ )?(on board|to vote|to write|with us)|talk (\w+ )?into|flip|sway|swing)/.test(t)) kind = 'pitch';
+      return { ...I('errand'), X: who, errand: { kind, target: who, about: rest[0] ?? null } };
+    }
+  }
   if (has(/(who('s| is) (targeting|after|coming for|gunning for) me|who wants me (out|gone)|any(one|body) (targeting|after|coming (for|after)|gunning for) me|someone (after|coming for) me|is my name out|heard my name|my name (come|came) up)/, t)) return I('ask_target_me');
   if (has(/(are you (voting|writing|going) (for |after )?me|am i (safe|going home|the target|in danger|good)|is my name|vote me out)/, t)) return I('ask_vote_me');
   // Idols: every way of asking about, claiming, or planning to play one.
-  if (has(new RegExp(`(i (have|found|got|'ve got|'ve found) (an?|the|my) (hidden )?${IDOL}|i'm holding (an?|the) ${IDOL})`), t)) return I('idol_claim');
+  if (has(new RegExp(`((^|[^a-z])i (have|found|got|'ve got|'ve found|just found) (an?|the|my) (hidden )?${IDOL}|(^|[^a-z])i'm holding (an?|the) ${IDOL})`), t)) return I('idol_claim');
   if (has(new RegExp(`(should i (play|use)|do i (play|use)|when should i play|i('m| am) (going to|gonna) play|is it time to play|play (it|my ${IDOL}|the ${IDOL}) (on|for) (me|myself)|save my ${IDOL}|play my ${IDOL})`), t)) return I('idol_mine');
   if (has(new RegExp(`((will|would|could|can) you (play|use) (it|that|your ${IDOL}|an? ${IDOL})|play (it|your ${IDOL}) (for|on) me|are you (going to|gonna) play|use your ${IDOL})`), t)) return I('idol_play');
-  if (X == null && has(new RegExp(`(do you (have|got)|did you (find|get)|are you holding|you (have|got|found) (an?|the) ${IDOL}|got an? ${IDOL}|have you found (it|one|anything|an? ${IDOL})|you find (it|one|anything)|tell me you found)`), t)) return I('ask_idol');
+  if (X == null && has(new RegExp(`((do|did) you (have|got|find|get)|are you holding|you (have|got|found)|got) (an?|the|your|any) (hidden )?${IDOL}|have you found (it|one|anything|an? ${IDOL})|did you find (it|one|anything)|you find (it|one|anything)|tell me you found`), t)) return I('ask_idol');
   if (X != null && X !== botId && has(new RegExp(`(has (an?|the) ${IDOL}|found (an?|the) ${IDOL}|holding (an?|the) ${IDOL}|got (an?|the) ${IDOL}|has one\\b|found it\\b)`), t) && !has(/^(does|did|do|is|has|have|who|what|where)\b|\?$|think|wonder/, t)) return I('idol_accuse');
   if (has(new RegExp(`\\b${IDOL}s?\\b|\\bclue\\b|(still|is it) out there|been (looking|searching)|(go|went|been) (looking|searching)|where (were|did) you (go|went|been)|sneaking off|disappear(ed|ing)?\\b|what were you doing (in|at|by) the|why were you (in|at|by) the`), t)) return I('idol_who');
+  if (has(/(swing|on the fence|undecided|in the middle|(can|could) we (get|bring|flip|pull|win) (over|in)?|bring (\w+ )?(in|over)|flip (someone|anybody|anyone)|who (else )?(can|could|should) we (get|bring|swing|flip|work on|talk to))/, t)) return I('ask_info');
+  if (has(/(who('s| is| are) (the|those|that) (\d+|one|two|three|other|last|extra) ?(more|others?|people|ones?)?|who are the others|name them|which (ones|people)|who exactly|who are they)/, t)) return { ...I('ask_numbers'), full: true };
   if (has(NUMBERS, t)) return I('ask_numbers');
   if (has(/(swing vote|who('s| is) (on the fence|undecided|in the middle)|what have you heard|heard anything|what('s| is) (going on|the word|the latest|the gossip|the tea)|any (gossip|news|intel|info|tea)|anything i should know|what are (people|they) saying|what('s| is) everyone saying|what did \w+ (say|tell)|did \w+ say|has \w+ said|what('s| is) \w+ (saying|planning|thinking)|who('s| is) saying)/, t)) return I('ask_info');
+  if (has(/\bsplit\b/, t)) return I('split');
   if (X != null && has(/(coming for you|targeting you|after you|said your name|wants you (out|gone)|gunning for you|voting (for )?you|wrote your name|out to get you)/, t)) return I('warn');
   if (X != null && has(/(i'm voting|i will vote|i'll vote|my vote is|i'm writing|i'm going with|i'm putting my vote|i'm in on|count me in|i'm still in|i'm with you on|i'll write)/, t)) return I('declare_vote');
   if (X == null && has(/^(i'm in|count me in|i'm still in|still in|i'm with you|deal|let's do it)\b/, t)) return { ...I('declare_vote'), X: topicOf(thread, botId) };
@@ -88,15 +126,35 @@ export function understand(text, botId, thread) {
   if (X != null && has(BADMOUTH, t)) return I('badmouth');
   if (X != null && has(/(what (do|did) you think (of|about)|how do you feel about|thoughts on|do you trust|opinion|what about|is \w+ (with you|trustworthy|a threat|loyal|safe)|how('s| is) \w+ playing)/, t)) return I('opinion');
   if (X != null && has(/(vote|out\b|go home|has to go|needs to go|blindside|get rid|target|cut|boot|send .* home|eliminate|take .* out|flip on|instead)/, t)) return I('propose_vote');
-  if (has(/(who (are|r) (you|u) (voting|writing|thinking|going)|who('s| is) going home|who should go|your (vote|plan|target)|what('s| is) the plan|who do you want (out|gone)|who are we voting|who('s| is) the target|plan tonight|thinking tonight)/, t)) return I('ask_vote');
+  if (has(/(who (are|r) (you|u) (voting|writing|thinking|going)|who('s| is) going home|who should go|your (vote|plan|target)|what('s| is) the plan|who do you want (out|gone)|who are we voting|who('s| is) the target|plan tonight|thinking tonight|what are you thinking|where('s| is) your (vote|head)|who('s| is) (it|going) (tonight|home)|who('s| is) (your|the) (pick|choice))/, t)) return I('ask_vote');
   if (has(/(who are you (working|close|closest|aligned|tight|tightest|allied) with|who('s| is) your closest|who('s| is) in your alliance|who do you trust|who are your people|who('s| is) your (ally|alliance|number one))/, t)) return I('ask_allies');
   if (has(/(alliance|work together|team up|final (two|2|three|3)|ride or die|partner up|stick together|join forces)/, t)) return I('ally');
   if (has(/(can i trust you|are we good|are you with me|you got my back|do you trust me|we cool)/, t)) return I('trust_q');
   if (has(/(i('ve| have) got your back|i('ll| will) protect you|you('re| are) safe with me|i won't vote (for )?you|i trust you|i'm with you|i'm loyal|you can trust me|i promise)/, t)) return I('loyalty');
   if (has(/\bsplit\b/, t)) return I('split');
   if (has(/^why\b|\bwhy (him|her|them|that)\b|why (would|do) you/, t)) return I('why');
-  if (has(/((nice|great|good) (job|game|work|win|move)|you('re| are) (great|awesome|amazing|killing it|smart)|well played|respect)/, t)) return I('compliment');
+  if (has(/((nice|great|good) (job|game|work|win|move)|you('re| are) (great|awesome|amazing|killing it|smart|so good)|you played (great|well|good|so well|amazing)|well played|respect|proud of you|you crushed it|you killed it)/, t)) return I('compliment');
   if (has(/^(hi|hey|hello|yo|sup|what's up|howdy|hiya)\b/, t)) return I('greeting');
+  // "What about you?" turns the castaway's own last question back on it.
+  if (has(/^(and )?(what about you|how about you|and you|what about u|wbu|hbu)\b/, t)) {
+    const lastBot = (thread || []).filter((m) => m.from !== H && m.from !== 0).at(-1)?.text?.toLowerCase() || '';
+    if (/(who|where).*(vote|thinking|tonight|head)|your vote/.test(lastBot)) return I('ask_vote');
+    if (/nervous|scared|worried/.test(lastBot)) return I('nerves');
+    return I('how_are_you');
+  }
+  // A bare yes/no right after a pitch ("...You in?") answers that pitch.
+  {
+    const lastBot = (thread || []).filter((m) => m.from !== H && m.from !== 0).at(-1)?.text || '';
+    const yes = /^(yes|yeah|yep|yup|sure|ok(ay)?|deal|i'm in|absolutely|definitely|for sure|let's do it|bet)\b/.test(t);
+    const no = /^(no|nope|nah|not (him|her|them|really)|i'd rather not|pass)\b/.test(t);
+    if ((yes || no) && /final two deal\?/i.test(lastBot)) return I(yes ? 'ally' : 'ack');
+    if ((yes || no) && /(you in\?|you good with that\?|are you with me\?|count you in\?|lock it in\?)\s*$/i.test(lastBot)) {
+      const who = topicOf(thread, botId);
+      if (who != null) return { ...I(yes ? 'declare_vote' : 'protect'), X: who };
+    }
+  }
+  // Short acknowledgements: keep the conversation going instead of asking what you meant.
+  if (has(/^(ok(ay)?|k|kk|cool|got it|gotcha|thanks|thank you|ty|sounds good|alright|bet|word|nice|great|perfect|for sure|true|fair|makes sense|yeah|yes|yep|yup|sure|no|nope|nah|maybe|i don't know|lol|haha+|lmao|hmm+|wow|damn|oof)[.!?]*$/, t)) return I('ack');
   if (has(/(challenge|immunity|necklace|won today|lost today)/, t)) return I('challenge_talk');
   if (has(/(nervous|scared|worried|anxious|stressed|freaking out|bad feeling)/, t)) return I('nerves');
   if (has(/(how are you|how're you|how's it going|holding up|you ok\b|you okay|you good\b|how you doing|how are things|how's camp|how have you been|how you been)/, t)) return I('how_are_you');
@@ -236,15 +294,18 @@ function coreReply(botId, text, thread, u) {
       if (enemies.length && chance(0.4)) { const lie = pick(aliveBots().filter((k) => k.id !== botId)); return R(`I heard ${lie.name} mention you. Could be nothing.`); }
       return R('I haven’t heard your name. Honestly.');
     }
+    case 'errand': return startErrand(botId, u.errand.kind, u.errand.target, u.errand.about);
     case 'ask_info': {
-      if (/swing|fence|undecided|in the middle/.test(u.t)) {
+      if (/swing|fence|undecided|in the middle|can we|could we|bring|flip|work on|talk to/.test(u.t)) {
         const target = s.botTold[botId] ?? plan;
-        const swing = aliveBots().filter((k) => k.id !== botId && k.id !== target && s.plan[k.id] !== target).sort((a, c) => s.trust[botId][c.id] - s.trust[botId][a.id])[0];
+        // Never name someone it already claimed was on board.
+        const claimed = new Set(mind(botId).claims?.[target]?.r === s.round ? mind(botId).claims[target].padded || [] : []);
+        const swing = aliveBots().filter((k) => k.id !== botId && k.id !== target && s.plan[k.id] !== target && !claimed.has(k.id)).sort((a, c) => s.trust[botId][c.id] - s.trust[botId][a.id])[0];
         if (!swing || target == null || target === H) return R('Honestly? Everyone. Nobody’s locked in yet.');
         const leaning = s.plan[swing.id];
         return R(honest ? `${swing.name}. ${cap(pronoun(swing.id))}’s leaning ${leaning === H ? 'you' : leaning === botId ? 'me' : leaning != null ? nm(leaning) : 'nowhere yet'}, but ${pronoun(swing.id)} could come over to ${nm(target)}. Talk to ${pronoun(swing.id, 'obj')}.` : `Probably ${swing.name}. Go work on ${pronoun(swing.id, 'obj')}.`, [
           { label: `What do you think of ${swing.name}?`, fx: () => chatReply(botId, `What do you think of ${swing.name}?`, thread) },
-          { label: 'Count me in', fx: () => chatReply(botId, `I'm in on ${nm(target)}`, thread) },
+          ...(s.promises[botId] === target ? [] : [{ label: 'Count me in', fx: () => chatReply(botId, `I'm in on ${nm(target)}`, thread) }]),
           { label: 'Who else is on board?', fx: () => chatReply(botId, 'Who else is on board?', thread) },
         ]);
       }
@@ -375,7 +436,7 @@ function coreReply(botId, text, thread, u) {
       return R(`${nm(X)} is hard to read. I haven’t figured ${pronoun(X, 'obj')} out yet.`);
     }
     case 'ask_vote': return replyTo(botId, 'who');
-    case 'ask_numbers': return replyTo(botId, 'numbers', X);
+    case 'ask_numbers': return replyTo(botId, 'numbers', X, u.full ? 'full' : undefined);
     case 'ask_allies': {
       const close = aliveBots().filter((k) => k.id !== botId).sort((x, y) => s.trust[botId][y.id] - s.trust[botId][x.id]).slice(0, 2);
       if (honest && close.length) return R(`I’m closest with ${close.map((k) => k.name).join(' and ')}. And you, if you want in.`);
@@ -387,7 +448,19 @@ function coreReply(botId, text, thread, u) {
       recordHuman(botId, 'h_loyal', botId);
       adjTrust(botId, H, 0.05 + b.t.loyal * 0.05);
       return R(tr > 0.1 ? F(['Same. I’ve got yours.', 'That means a lot out here. Same to you.']) : F(['We’ll see. Actions matter more than words.', 'Okay. Prove it at Tribal.']));
-    case 'split': return replyTo(botId, 'split');
+    case 'split': {
+      // "Split between A and B": answer about those two, from this castaway's view of each.
+      if (u.names.length >= 2) {
+        const [a, c] = u.names.filter((k) => k !== botId);
+        if (a == null || c == null) return replyTo(botId, 'split');
+        const pickOne = reasonsAgainst(botId, a)[0].w >= reasonsAgainst(botId, c)[0].w ? a : c;
+        const other = pickOne === a ? c : a;
+        if (s.allied[botId][a] || s.allied[botId][c]) return R(`I can’t write ${s.allied[botId][a] ? nm(a) : nm(c)}. Split it some other way.`);
+        backingVote(botId, pickOne);
+        return R(`Smart, in case of an idol. I’ll take ${nm(pickOne)}; you and whoever else go ${nm(other)}. ${reasonsAgainst(botId, pickOne)[0].text}`);
+      }
+      return replyTo(botId, 'split');
+    }
     case 'why': {
       const who = X ?? s.botTold[botId] ?? plan;
       if (who == null || who === H) return R('Just a feeling. It’s a game of instincts.');
@@ -414,6 +487,15 @@ function coreReply(botId, text, thread, u) {
       const d = perceivedDanger(botId);
       if (d > 0.45) return R(F(['Honestly? Yeah. I think my name is out there.', 'Very. Something feels off for me today.']));
       return R(F(['Everybody’s nervous. Anyone who says they’re not is lying.', 'A little. Tribal always makes my stomach flip.', 'I’m okay. I just want tonight to be over.']));
+    }
+    case 'ack': {
+      // React to the tone of a short reply, then move the conversation forward.
+      if (/^(no|nope|nah)/.test(u.t)) return R(F(['Fair enough.', 'Okay. Your call.', 'Noted.']));
+      if (/^(maybe|i don't know|hmm)/.test(u.t)) return R(F(['Think it over. Just don’t take too long.', 'Okay. Let me know before Tribal.']));
+      if (/^(lol|haha|lmao)/.test(u.t)) return R(F(['Ha. Laughing so I don’t cry out here.', 'Glad someone’s having fun.']));
+      if (/^(wow|damn|oof)/.test(u.t)) return R(F(['Yeah. It’s a lot.', 'Tell me about it.']));
+      if (/^(thanks|thank you|ty)/.test(u.t)) { adjTrust(botId, H, 0.02); return R(F(['Of course. We look out for each other.', 'Anytime.'])); }
+      return R(F(['Good. Keep it between us.', 'Okay. Talk later.', 'Cool. Find me before Tribal.']));
     }
     case 'how_are_you': {
       adjTrust(botId, H, 0.02);
@@ -467,7 +549,11 @@ export function followUps(botId, reply, u) {
   const intent = u?.intent;
   const add = (label) => { if (label && out.length < 3 && !out.some((o) => o.label === label)) out.push(say(label)); };
   // The conversation's thread first: answer what was just said, then steer.
-  if (intent?.startsWith('idol')) {
+  if (intent === 'errand') {
+    add('Thanks. Let me know what they say');
+    add('Who else is on board?');
+    add('What have you heard?');
+  } else if (intent?.startsWith('idol')) {
     const sus = alive().filter((p) => p.id !== botId && p.id !== H).sort((a, b) => s.idolSusp[b.id] - s.idolSusp[a.id])[0];
     if (X != null && X !== H) add('Should we split the votes?');
     if (X == null && sus) add(`Does ${sus.name} have an idol?`);
@@ -476,7 +562,7 @@ export function followUps(botId, reply, u) {
     add('Who are you thinking tonight?');
   } else if (intent === 'ask_numbers') {
     add('Who’s the swing vote?');
-    add('What if they have an idol?'.replace('they', X != null ? nm(X) : 'they'));
+    add(X != null ? `What if ${nm(X)} has an idol?` : 'What if they have an idol?');
     add('Is anyone coming for me?');
   } else if (intent === 'accuse' || intent === 'insult') {
     add('I’m with you, I promise');

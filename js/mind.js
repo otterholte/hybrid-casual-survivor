@@ -106,7 +106,8 @@ export function reasonsAgainst(botId, X) {
   // Softer reads, from what anyone can see around camp.
   const piling = aliveBots().filter((k) => k.id !== botId && k.id !== X && s.plan[k.id] === X).length;
   if (piling >= 2) add(0.2 + piling * 0.05, `Half of camp is already saying ${p.name}’s name. I’d rather be on the right side of it.`);
-  if (p.t.physical > 0.7) add(0.28, `${p.name} is a beast in challenges. Get ${pronoun(X, 'obj')} out before ${pronoun(X)} starts winning necklaces.`);
+  const pods = p.stats.podiums || 0;
+  if (!p.stats.wins && pods) add(0.2 + pods * 0.1, `${p.name} has finished top three in ${pods === 1 ? 'a challenge' : `${pods} challenges`}. One more good day and ${pronoun(X)}’s wearing the necklace.`);
   if (p.t.strategic > 0.72) add(0.26, `${p.name} talks to everybody and never gives a straight answer. That’s someone running a game.`);
   if (p.t.social > 0.85) add(0.24, `${p.name} is way too easy to like. That’s a jury threat.`);
   if (s.trust[X][botId] < 0 || s.trust[botId][X] < 0.05) add(0.18, `I don’t know where ${p.name}’s head is at, and I can’t afford a question mark.`);
@@ -148,7 +149,7 @@ export function reasonsToKeep(botId, X) {
   const s = S(), p = P(X), out = [];
   if (s.allied[botId][X]) out.push(`${p.name} is with me. That’s my person.`);
   if (s.trust[botId][X] > 0.35) out.push(`${p.name} has been straight with me since day one.`);
-  if (p.stats.wins === 0 && p.t.physical < 0.45) out.push(`${p.name} isn’t winning anything. I’d rather sit next to ${pronoun(X, 'obj')} at the end.`);
+  if (p.stats.wins === 0 && !p.stats.podiums && s.round > 1) out.push(`${p.name} isn’t winning anything. I’d rather sit next to ${pronoun(X, 'obj')} at the end.`);
   return out;
 }
 

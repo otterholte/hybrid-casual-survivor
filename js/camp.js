@@ -1,6 +1,6 @@
 // Back at Camp: talk to anyone (or a group) as much as you like, plus ONE excursion per day (spy or idol search).
 import { game, P, nm, alive, aliveBots, human, adjTrust } from './state.js';
-import { replyTo, botOpener, botConvo, computePlans, spendAdv } from './ai.js';
+import { replyTo, botOpener, botConvo, computePlans, spendAdv, runErrand } from './ai.js';
 import { chatReply, understand, matchOption, isGameTalk, FLAVOR_INTENTS, GROUP_PRESETS, groupReply } from './chat.js';
 import { llm, chatter } from './llm.js';
 import { PRESETS, ZONES, ADVANTAGES } from './data.js';
@@ -99,6 +99,8 @@ export function runCamp() {
     const sim = setInterval(() => {
       if (finished || clock.paused) return;
       elapsed += 1;
+      S.campElapsed = elapsed;
+      for (const e of (S.errands || []).filter((x) => !x.done && x.due <= elapsed)) finishErrand(e);
       nextConvo -= 1;
       if (nextConvo <= 0) {
         nextConvo = rand(5, 9);
@@ -123,6 +125,25 @@ export function runCamp() {
       }
     }, 1000);
 
+    // A castaway comes back from an errand you sent it on.
+    function finishErrand(e) {
+      const out = runErrand(e);
+      if (!out || finished) return;
+      for (const m of out.msgs) S.convos.push({ ...m, t: performance.now() });
+      activity?.capture?.(out.msgs);
+      pushFeed(`${nm(e.bot)} pulled ${nm(e.target)} aside.`, '👥');
+      const options = out.report.options?.map((o) => ({ label: o.label, fx: () => chatReply(e.bot, o.label, S.threads[e.bot]) }))
+        ?? chatReply(e.bot, 'what have you heard?', S.threads[e.bot]).options;
+      S.threads[e.bot].push({ from: e.bot, text: out.report.text, options, day });
+      if (openChatId === e.bot) repaintChat?.();
+      else {
+        S.unread.add(e.bot);
+        sfx('ping');
+        toast(`💬 <b>${nm(e.bot)}</b> is back from talking to ${nm(e.target)}`, 'msg');
+        if (view === 'hub' || view === 'inbox') render();
+      }
+    }
+
     function sendOpener() {
       const pool = aliveBots().filter((b) => !S.threads[b.id].some((m) => m.day === day && m.from === b.id));
       if (!pool.length || finished) return;
@@ -140,6 +161,8 @@ export function runCamp() {
 
     function end() {
       if (finished) return;
+      // Errands still in progress happen anyway; you hear about them tomorrow.
+      for (const e of (S.errands || []).filter((x) => !x.done)) { const out = runErrand(e); if (out) { for (const m of out.msgs) S.convos.push({ ...m, t: performance.now() }); S.threads[e.bot]?.push({ from: e.bot, text: out.report.text, day }); } }
       finished = true;
       clearInterval(sim);
       timer?.stop();

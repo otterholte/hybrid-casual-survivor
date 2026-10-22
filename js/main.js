@@ -243,6 +243,7 @@ async function playSeason() {
     S.threat[w.id] += 0.2;
     S.lastWinner = w.id;
     awardPrizes(res.order, prizes);
+    for (const id of res.order.slice(1, 3)) P(id).stats.podiums = (P(id).stats.podiums || 0) + 1; // 2nd and 3rd: everyone saw it
     computePlans();
     if (S.humanOut && !fast) {
       setScene('day');
